@@ -1,0 +1,16 @@
+# --- Web Framework & Server ---
+fastapi
+uvicorn
+pydantic
+python-multipart
+
+# --- Video & Audio Processing ---
+moviepy
+pydub
+opencv-python
+numpy
+
+# --- AI & Text/Speech Services ---
+faster-whisper
+edge-tts
+nltk
