@@ -91,18 +91,34 @@ export const useTimelineDrag = (
             store.setTextConfig({ ...store.textConfig, start: newStart, end: newEnd });
             break;
           }
-          case 'audio-start': 
-            store.setAudioConfig({ ...store.audioConfig, start: Math.min(timeOnTimeline, store.audioConfig.end - 0.2) }); 
+          case 'audio-start': {
+            // Khi kéo đầu Audio sang phải (co ngắn lại), không được để vượt quá điểm kết thúc trừ đi khoảng hở tối thiểu
+            const maxStart = store.audioConfig.end - 0.2;
+            // Đồng thời chiều dài (end - newStart) không bao giờ được phép lớn hơn audioDuration thật
+            const minStart = store.audioConfig.end - store.audioDuration;
+            const safeStart = Math.max(minStart, Math.min(timeOnTimeline, maxStart));
+            store.setAudioConfig({ ...store.audioConfig, start: safeStart }); 
             break;
-          case 'audio-end': 
-            store.setAudioConfig({ ...store.audioConfig, end: Math.min(timeOnTimeline, store.audioConfig.start + store.audioDuration) }); 
+          }
+          case 'audio-end': {
+            // Điểm kết thúc tối thiểu phải cách điểm start 0.2 giây
+            const minEnd = store.audioConfig.start + 0.2;
+            // Điểm kết thúc tối đa TUYỆT ĐỐI không được vượt quá điểm start + thời lượng file thật
+            const maxEnd = store.audioConfig.start + store.audioDuration;
+            const safeEnd = Math.max(minEnd, Math.min(timeOnTimeline, maxEnd));
+            store.setAudioConfig({ ...store.audioConfig, end: safeEnd }); 
             break;
+          }
           case 'audio-move': {
-            const duration = store.audioConfig.end - store.audioConfig.start;
-            let newStart = timeOnTimeline - (duration / 2);
-            let newEnd = newStart + duration;
-            if (newStart < 0) { newStart = 0; newEnd = duration; }
-            if (newEnd > displayDuration) { newEnd = displayDuration; newStart = displayDuration - duration; }
+            // Khi di chuyển cả track, tính toán độ dài track hiện tại (chắc chắn luôn nhỏ hơn hoặc bằng audioDuration)
+            const currentClipDuration = Math.min(store.audioConfig.end - store.audioConfig.start, store.audioDuration);
+            let newStart = timeOnTimeline - (currentClipDuration / 2);
+            let newEnd = newStart + currentClipDuration;
+            
+            // Chặn viền Timeline trái và phải
+            if (newStart < 0) { newStart = 0; newEnd = currentClipDuration; }
+            if (newEnd > displayDuration) { newEnd = displayDuration; newStart = displayDuration - currentClipDuration; }
+            
             store.setAudioConfig({ ...store.audioConfig, start: newStart, end: newEnd });
             break;
           }
