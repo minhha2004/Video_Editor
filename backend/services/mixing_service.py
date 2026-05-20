@@ -34,23 +34,24 @@ STICKER_KEYWORD_MAP = {
 
 def generate_auto_stickers(transcript_words):
     suggested_stickers = []
+    DEFAULT_DURATION = 1.0 # Ép cứng thời lượng hiển thị nhấp nháy đúng 1.0 giây
     
-    # THAY ĐỔI 1: Đặt thời lượng mỗi sticker là 1.0 giây
-    DEFAULT_DURATION = 1.0 
-    
-    # Biến này để xếp hàng các sticker, tránh việc 2 sticker hiện đè lên nhau 
-    # cùng lúc nếu trong 1 câu người ta nói quá nhiều từ khóa.
-    current_time_cursor = 0.0
-
     for item in transcript_words:
-        # THAY ĐỔI 2: Xử lý dữ liệu STT đang là một CÂU chứ không phải 1 từ
-        sentence = str(item.get('word', '')).lower()
+        # Hỗ trợ linh hoạt cả key 'word' hoặc 'text' truyền từ Frontend
+        sentence = str(item.get('word', '') or item.get('text', '')).lower()
         segment_start = float(item.get('start', 0))
+        segment_end = float(item.get('end', 0))
+        segment_duration = segment_end - segment_start
         
-        # Tách câu thành các từ rời rạc bằng Regex
+        # Tách câu thành mảng các từ rời rạc bằng Regex
         words = re.findall(r'[a-z]+', sentence)
+        total_words = len(words)
         
-        for w in words:
+        if total_words == 0:
+            continue
+            
+        # Duyệt qua từng từ kèm theo vị trí của nó trong câu (Index) để phân rã thời gian
+        for idx, w in enumerate(words):
             # NLP: Đưa từ về dạng nguyên thể (houses -> house, spent -> spend)
             lemma_n = lemmatizer.lemmatize(w, pos='n') 
             lemma_v = lemmatizer.lemmatize(w, pos='v') 
@@ -60,26 +61,27 @@ def generate_auto_stickers(transcript_words):
             for sticker_file, keywords in STICKER_KEYWORD_MAP.items():
                 if w in keywords or lemma_n in keywords or lemma_v in keywords:
                     matched_sticker = sticker_file
-                    break # Dừng tìm keyword khi đã trúng
+                    break # Dừng tìm kiếm khi đã khớp từ khóa
                     
             if matched_sticker:
-                # Tính toán thời điểm hiện sticker. 
-                # Nếu câu nói bắt đầu ở giây thứ 5, mà cursor đang ở giây thứ 6 (do sticker trước đó chưa chạy xong), 
-                # thì dời sticker này xuống giây thứ 6 để nối tiếp.
-                sticker_start = max(segment_start, current_time_cursor)
+                # THUẬT TOÁN ĐỊNH VỊ THỜI GIAN THỰC CỦA TỪ TRONG CÂU ĐOẠN PHỤ ĐỀ:
+                word_progress = idx / total_words
+                sticker_start = segment_start + (segment_duration * word_progress)
+                
+                # Đảm bảo điểm kết thúc của Sticker không vượt quá giới hạn của block phụ đề đó
+                if sticker_start + DEFAULT_DURATION > segment_end:
+                    sticker_start = max(segment_start, segment_end - DEFAULT_DURATION)
                 
                 suggested_stickers.append({
                     "id": str(uuid.uuid4()), 
                     "type": "sticker",
+                    # SỬA ĐỒNG BỘ: Gọi trực tiếp tới thư mục public/stickers/ của Frontend Next.js
                     "src": f"/stickers/{matched_sticker}", 
-                    "startTime": sticker_start,
-                    "endTime": sticker_start + DEFAULT_DURATION,
-                    "layer": 2, 
+                    "startTime": round(sticker_start, 2),
+                    "endTime": round(sticker_start + DEFAULT_DURATION, 2),
+                    "layer": 50, # Đẩy lên layer 50 nằm trên cùng khớp với thiết kế chung
                     "position": {"x": 50, "y": 50}, 
-                    "scale": 1.0
+                    "scale": 0.8 # Tỉ lệ zoom 0.8 vừa vặn khung hình
                 })
-                
-                # Cập nhật cursor để sticker tiếp theo (nếu có) bị đẩy lùi lại 1.1s (cách nhau 0.1s cho mượt)
-                current_time_cursor = sticker_start + DEFAULT_DURATION + 0.1
             
     return suggested_stickers
