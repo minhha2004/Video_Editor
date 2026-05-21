@@ -37,7 +37,6 @@ export const aiService = {
 
     // --- BẢN VÁ LỖI ĐỒNG BỘ ÂM THANH (SYNC FIX) ---
     // Vì AI thường nhận diện hơi sớm, ta cộng thêm một khoảng trễ (giây).
-    // Bạn có thể tăng giảm số 0.3 này (ví dụ 0.2, 0.4) cho đến khi khớp mồm nhất.
     const SYNC_OFFSET = 0.3; 
     
     if (data.subtitles && Array.isArray(data.subtitles)) {
@@ -82,6 +81,7 @@ export const aiService = {
 
   /**
    * AI tự động phân tích ngữ cảnh và gợi ý chèn Sticker (Auto Mixing)
+   * CHUẨN HÓA: Trả về kết quả thô sạch từ AI để nhường quyền xử lý gộp mảng an toàn cho Zustand Store
    */
   autoMixStickers: async (transcript: any[]) => {
     // Lấy dữ liệu thời gian chính xác của TỪNG CHỮ thay vì cả câu
@@ -111,12 +111,13 @@ export const aiService = {
     }
     
     const data = await response.json();
-    if (data.success) {
+    if (data.success && Array.isArray(data.stickers)) {
+      // Trả về mảng sticker gợi ý nguyên bản từ Backend nhả ra
       return data.stickers;
     }
+    
     return [];
   },
-
 
   /**
    * Gửi toàn bộ cấu hình để Render video cuối cùng

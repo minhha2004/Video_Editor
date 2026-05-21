@@ -1,14 +1,16 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles # Quản lý dữ liệu file tĩnh cho Frontend
-from pydantic import BaseModel, Field # Sử dụng Field để map từ khóa linh hoạt
+from fastapi.staticfiles import StaticFiles  # Quản lý dữ liệu file tĩnh cho Frontend
+from pydantic import BaseModel  # Sử dụng BaseModel để map từ khóa linh hoạt
 from typing import List, Optional
 import shutil
 import os
 import uuid
 import json
-import requests # Sử dụng requests để gọi API ngoài nhẹ máy
+
+# IMPORT THƯ VIỆN AI LOCAL MỚI: Tách nền ngoại tuyến không phụ thuộc Internet
+from rembg import remove, new_session
 
 # Import các service xử lý AI và Video sẵn có trong dự án của bạn
 from services.stt_service import transcribe_audio
@@ -24,6 +26,7 @@ app = FastAPI(title="Short Editor Pro Backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,69 +43,74 @@ os.makedirs(STATIC_STICKER_DIR, exist_ok=True)
 # Gắn thư mục static vào FastAPI để cho phép Frontend truy cập ảnh tĩnh qua URL
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- NÂNG CẤP CLASS ĐỂ TRÁNH LỖI VALIDATION 422 ---
+# Khởi tạo Session model AI bóc nền bản nhẹ (u2net_thin) tối ưu hóa tài nguyên phần cứng
+# Trong lần đầu khởi chạy, thư viện sẽ tự động tải file ONNX (~40MB) về lưu tại bộ nhớ máy.
+try:
+    rembg_session = new_session("u2net_thin")
+    print("[+] AI Background Remover Model (u2net_thin) initialized successfully!")
+except Exception as e:
+    rembg_session = None
+    print(f"[-] Failed to initialize rembg session, using default mode: {str(e)}")
+
+
+# --- CLASS MAP DATA ĐỂ TRÁNH LỖI VALIDATION 422 ---
 class WordItem(BaseModel):
-    word: Optional[str] = None # Cho phép rỗng nếu frontend gửi trường text
-    text: Optional[str] = None # Tương thích hoàn toàn với mảng phụ đề STT gửi lên
+    word: Optional[str] = None  # Cho phép rỗng nếu frontend gửi trường text
+    text: Optional[str] = None  # Tương thích hoàn toàn với mảng phụ đề STT gửi lên
     start: float
     end: float
+
 
 @app.get("/")
 async def root():
     return {"status": "online", "message": "Short Editor Backend is ready!"}
 
-# --- ENDPOINT: AI IMAGE-TO-STICKER BACKGROUND REMOVER ---
+
+# --- ENDPOINT: AI IMAGE-TO-STICKER BACKGROUND REMOVER (HOÀN TOÀN LOCAL OFF-LINE) ---
 @app.post("/api/remove-bg")
 async def api_remove_background(file: UploadFile = File(...)):
     """
-    Nhận file ảnh từ Frontend, gọi API remove.bg để xóa nền tự động,
-    lưu vào thư mục static và trả về cấu hình Sticker hoàn chỉnh cho Frontend.
+    Nhận file ảnh từ Frontend, tự động bóc tách nền bằng mô hình AI Local (Rembg),
+    không gửi dữ liệu ra mạng internet, bảo mật dữ liệu tuyệt đối, lưu file vào static.
     """
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File tải lên bắt buộc phải là định dạng hình ảnh!")
 
     try:
+        # Đọc dữ liệu ảnh thô từ Client gửi lên RAM
         input_data = await file.read()
 
-        # Đã chèn chính xác token urWYevyqtcHpHLhpdT8eKQPT của bạn vào header cấu hình
-        response = requests.post(
-            "https://api.remove.bg/v1.0/removebg",
-            files={"image_file": (file.filename, input_data, file.content_type)},
-            data={"size": "auto"},
-            headers={"X-Api-Key": "urWYevyqtcHpHLhpdT8eKQPT"} 
-        )
+        # Thực thi mô hình AI bóc tách nền trực tiếp trên CPU Local thông qua session đã khởi tạo
+        output_data = remove(input_data, session=rembg_session)
 
-        if response.status_code != 200:
-            print(f"Lỗi phản hồi chi tiết từ remove.bg API: {response.text}")
-            raise HTTPException(
-                status_code=response.status_code, 
-                detail="Dịch vụ tách nền AI bên thứ 3 đang bận hoặc Token gặp sự cố."
-            )
-
-        unique_filename = f"custom_{uuid.uuid4().hex}.png"
+        # Định dạng tên file png trong suốt độc bản tránh trùng lặp
+        unique_filename = f"custom_{uuid.uuid4().hex[:8]}.png"
         output_path = os.path.join(STATIC_STICKER_DIR, unique_filename)
 
+        # Ghi file sticker sạch đã bóc nền vào thư mục tĩnh lưu trữ nội bộ
         with open(output_path, "wb") as f:
-            f.write(response.content)
+            f.write(output_data)
 
+        # Trả về cấu hình Sticker với cấu trúc object lồng khớp 100% với Frontend Store
         return {
             "success": True,
             "sticker": {
                 "id": f"sticker_{uuid.uuid4().hex[:8]}",
-                "src": f"http://localhost:8000/static/stickers/{unique_filename}", # URL ảnh tĩnh
+                "src": f"http://localhost:8000/static/stickers/{unique_filename}",
                 "startTime": 0,    
                 "endTime": 4,      
-                "scale": 0.8,      
+                "scale": 1.0,      
                 "layer": 50,       
                 "position": {"x": 50, "y": 50} 
             }
         }
 
-    except HTTPException as he:
-        raise he
     except Exception as e:
-        print(f"Lỗi hệ thống khi xử lý tách nền: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Xảy ra lỗi trong quá trình xử lý tách nền AI: {str(e)}")
+        print(f"[-] Lỗi hệ thống khi xử lý tách nền Local: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Xảy ra lỗi trong quá trình xử lý tách nền AI Local: {str(e)}"
+        )
 
 
 @app.post("/api/stt")
@@ -127,6 +135,7 @@ async def api_stt(file: UploadFile = File(...)):
         if os.path.exists(file_path):
             os.remove(file_path)
 
+
 @app.post("/api/tts")
 async def api_tts(data: dict):
     """
@@ -139,12 +148,15 @@ async def api_tts(data: dict):
     file_id = str(uuid.uuid4())
     output_path = os.path.join(EXPORT_DIR, f"{file_id}.mp3")
     
-    success = await generate_voiceover(text, output_path)
-    
-    if success:
-        return FileResponse(output_path, media_type="audio/mpeg", filename="ai-voice.mp3")
-    else:
-        raise HTTPException(status_code=500, detail="Lỗi khi tạo giọng nói AI")
+    try:
+        success = await generate_voiceover(text, output_path)
+        if success:
+            return FileResponse(output_path, media_type="audio/mpeg", filename="ai-voice.mp3")
+        else:
+            raise HTTPException(status_code=500, detail="Lỗi khi tạo giọng nói AI")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/render")
 async def api_render(
@@ -183,6 +195,7 @@ async def api_render(
             if p and os.path.exists(p):
                 os.remove(p)
 
+
 @app.post("/api/ai/detect-highlight")
 async def api_detect_highlight(file: UploadFile = File(...)):
     job_id = str(uuid.uuid4())
@@ -197,6 +210,7 @@ async def api_detect_highlight(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 @app.post("/api/ai/cut-silence")
 async def api_cut_silence(file: UploadFile = File(...)):
@@ -214,6 +228,7 @@ async def api_cut_silence(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
 
 # --- VÁ TRIỆT ĐỂ LỖI ĐÓN NHẬN DATA AUTO MIX ---
 @app.post("/api/ai/auto-mix")
@@ -240,6 +255,7 @@ async def api_auto_mix(transcript: List[WordItem]):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi xử lý Auto Mixing tại Backend: {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn

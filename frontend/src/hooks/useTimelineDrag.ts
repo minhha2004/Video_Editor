@@ -6,7 +6,7 @@ export const useTimelineDrag = (
   containerRef: React.RefObject<HTMLDivElement | null>,
   videoRef: React.RefObject<HTMLVideoElement | null>
 ) => {
-  const store = useVideoStore();
+  const store = useVideoStore() as any;
 
   /**
    * Logic Ánh xạ thời gian (Time Mapping):
@@ -32,7 +32,42 @@ export const useTimelineDrag = (
   const handleDrag = (e: React.MouseEvent | MouseEvent) => {
     if (!store.isDragging || store.duration === 0) return;
     
-    // 1. Kéo vị trí Text trên màn hình Preview
+    // Lấy ID của sticker đang được chọn tương tác từ window toàn cục
+    const activeStickerId = (window as any).activeStickerId;
+
+    // ==========================================
+    // 1. TƯƠNG TÁC CHUỘT TRÊN MÀN HÌNH PREVIEW
+    // ==========================================
+
+    // CASE A: DI CHUYỂN VỊ TRÍ STICKER TRÊN MÀN HÌNH PREVIEW
+    if (store.isDragging === 'sticker-pos' && activeStickerId && containerRef.current) {
+      const cRect = containerRef.current.getBoundingClientRect();
+      const pctX = ((e.clientX - cRect.left) / cRect.width) * 100;
+      const pctY = ((e.clientY - cRect.top) / cRect.height) * 100;
+
+      store.updateSticker(activeStickerId, {
+        position: {
+          x: Math.max(0, Math.min(pctX, 100)),
+          y: Math.max(0, Math.min(pctY, 100))
+        }
+      });
+      return;
+    }
+
+    // CASE B: CO GIÃN PHÓNG TO / THU NHỎ STICKER (RESIZE/SCALE)
+    if (store.isDragging === 'sticker-scale' && activeStickerId) {
+      const targetSticker = store.stickers.find((s: any) => s.id === activeStickerId);
+      if (!targetSticker) return;
+
+      const currentScale = targetSticker.scale || 1;
+      const scaleDelta = e.movementX * 0.01;
+      const newScale = Math.max(0.3, Math.min(currentScale + scaleDelta, 3.0));
+
+      store.updateSticker(activeStickerId, { scale: newScale });
+      return;
+    }
+
+    // CASE C: KÉO VỊ TRÍ TEXT TRÊN MÀN HÌNH PREVIEW
     if (store.isDragging === 'text-pos' && containerRef.current) {
       const cRect = containerRef.current.getBoundingClientRect();
       store.setTextConfig({
@@ -43,7 +78,23 @@ export const useTimelineDrag = (
       return;
     }
 
-    // 2. Thao tác trên Timeline
+    // CASE D (MỚI BỔ SUNG): CO GIÃN PHÓNG TO / THU NHỎ KÍCH THƯỚC CHỮ (TEXT SCALE)
+    if (store.isDragging === 'text-scale') {
+      const currentFontSize = store.textConfig.fontSize || 40;
+      // Di chuột sang phải (e.movementX > 0) chữ to lên, sang trái chữ nhỏ đi
+      const fontSizeDelta = e.movementX * 0.5;
+      const newFontSize = Math.max(12, Math.min(currentFontSize + fontSizeDelta, 120)); // Giới hạn kích thước chữ từ 12px đến 120px
+
+      store.setTextConfig({
+        ...store.textConfig,
+        fontSize: Math.round(newFontSize)
+      });
+      return;
+    }
+
+    // ==========================================
+    // 2. THAO TÁC TRÊN THANH TIMELINE XỬ LÝ CHUỘT
+    // ==========================================
     const rect = timelineRef.current?.getBoundingClientRect();
     if (rect) {
       const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
@@ -66,6 +117,48 @@ export const useTimelineDrag = (
       } else {
         // Xử lý các loại kéo Move/Trim khác
         switch(store.isDragging) {
+          // ------------------------------------------
+          // KHỐI LOGIC TRƯỢT KÉO / TRIM STICKER TRÊN TIMELINE
+          // ------------------------------------------
+          case 'sticker-start': {
+            if (!activeStickerId) break;
+            const target = store.stickers.find((s: any) => s.id === activeStickerId);
+            if (target) {
+              store.updateSticker(activeStickerId, {
+                startTime: Math.max(0, Math.min(timeOnTimeline, target.endTime - 0.2))
+              });
+            }
+            break;
+          }
+          case 'sticker-end': {
+            if (!activeStickerId) break;
+            const target = store.stickers.find((s: any) => s.id === activeStickerId);
+            if (target) {
+              store.updateSticker(activeStickerId, {
+                endTime: Math.max(target.startTime + 0.2, Math.min(timeOnTimeline, displayDuration))
+              });
+            }
+            break;
+          }
+          case 'sticker-move': {
+            if (!activeStickerId) break;
+            const target = store.stickers.find((s: any) => s.id === activeStickerId);
+            if (target) {
+              const duration = target.endTime - target.startTime;
+              let newStart = timeOnTimeline - (duration / 2);
+              let newEnd = newStart + duration;
+              
+              if (newStart < 0) { newStart = 0; newEnd = duration; }
+              if (newEnd > displayDuration) { newEnd = displayDuration; newStart = displayDuration - duration; }
+              
+              store.updateSticker(activeStickerId, { startTime: newStart, endTime: newEnd });
+            }
+            break;
+          }
+
+          // ------------------------------------------
+          // CÁC LOGIC HỆ THỐNG GỐC
+          // ------------------------------------------
           case 'video-move': {
             const duration = store.trimEnd - store.trimStart;
             let newStart = timeOnTimeline - (duration / 2);
@@ -92,33 +185,25 @@ export const useTimelineDrag = (
             break;
           }
           case 'audio-start': {
-            // Khi kéo đầu Audio sang phải (co ngắn lại), không được để vượt quá điểm kết thúc trừ đi khoảng hở tối thiểu
             const maxStart = store.audioConfig.end - 0.2;
-            // Đồng thời chiều dài (end - newStart) không bao giờ được phép lớn hơn audioDuration thật
             const minStart = store.audioConfig.end - store.audioDuration;
             const safeStart = Math.max(minStart, Math.min(timeOnTimeline, maxStart));
             store.setAudioConfig({ ...store.audioConfig, start: safeStart }); 
             break;
           }
           case 'audio-end': {
-            // Điểm kết thúc tối thiểu phải cách điểm start 0.2 giây
             const minEnd = store.audioConfig.start + 0.2;
-            // Điểm kết thúc tối đa TUYỆT ĐỐI không được vượt quá điểm start + thời lượng file thật
             const maxEnd = store.audioConfig.start + store.audioDuration;
             const safeEnd = Math.max(minEnd, Math.min(timeOnTimeline, maxEnd));
             store.setAudioConfig({ ...store.audioConfig, end: safeEnd }); 
             break;
           }
           case 'audio-move': {
-            // Khi di chuyển cả track, tính toán độ dài track hiện tại (chắc chắn luôn nhỏ hơn hoặc bằng audioDuration)
             const currentClipDuration = Math.min(store.audioConfig.end - store.audioConfig.start, store.audioDuration);
             let newStart = timeOnTimeline - (currentClipDuration / 2);
             let newEnd = newStart + currentClipDuration;
-            
-            // Chặn viền Timeline trái và phải
             if (newStart < 0) { newStart = 0; newEnd = currentClipDuration; }
             if (newEnd > displayDuration) { newEnd = displayDuration; newStart = displayDuration - currentClipDuration; }
-            
             store.setAudioConfig({ ...store.audioConfig, start: newStart, end: newEnd });
             break;
           }

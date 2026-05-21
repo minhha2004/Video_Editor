@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { useVideoStore } from '../../../../store/useVideoStore';
 
@@ -6,14 +8,15 @@ interface TextLayerProps {
 }
 
 export const TextLayer = ({ onTextMouseDown }: TextLayerProps) => {
-  // Trích xuất toàn bộ state cần thiết để theo dõi và cập nhật Text Configuration
-  const { showText, currentTime, textConfig, setTextConfig } = useVideoStore();
+  // Trích xuất toàn bộ state cần thiết từ Zustand Store gốc (Dòng chữ độc bản)
+  const store = useVideoStore() as any;
+  const { showText, currentTime, textConfig, setTextConfig, setShowText, setIsDragging } = store;
   
   // State cục bộ để chuyển đổi linh hoạt giữa chế độ Drag và Edit Text
   const [isEditingText, setIsEditingText] = useState(false);
 
   // Kiểm tra điều kiện hiển thị của Text Layer theo Timeline
-  const isTextVisible = showText && currentTime >= textConfig.start && currentTime <= textConfig.end;
+  const isTextVisible = showText && textConfig && currentTime >= textConfig.start && currentTime <= textConfig.end;
 
   if (!isTextVisible) return null;
 
@@ -27,7 +30,7 @@ export const TextLayer = ({ onTextMouseDown }: TextLayerProps) => {
       className={`absolute p-2 border transition-all group z-20 ${
         isEditingText 
           ? 'border-white/50 bg-black/40 rounded-lg cursor-text' 
-          : 'border-transparent hover:border-indigo-500/50 cursor-move'
+          : 'border-dashed border-indigo-500/50 hover:border-indigo-500 cursor-move'
       }`}
       style={{ 
         left: `${textConfig.x}%`, 
@@ -35,21 +38,41 @@ export const TextLayer = ({ onTextMouseDown }: TextLayerProps) => {
         transform: 'translate(-50%, -50%)' 
       }}
     >
+      {/* NÚT XÓA NHANH TEXT (Hình tròn chữ ✕ màu đỏ) - Nằm ở góc trên bên phải */}
+      {!isEditingText && (
+        <button
+          title="Xóa văn bản"
+          className="absolute -top-3 -right-3 w-5 h-5 bg-red-500 hover:bg-red-600 border-2 border-white text-white rounded-full flex items-center justify-center font-black text-[10px] cursor-pointer z-50 shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-auto"
+          onClick={(e) => {
+            e.stopPropagation(); // Chặn lan truyền không kéo vị trí
+            e.preventDefault();
+            if (setShowText) {
+              setShowText(false); // Ẩn hoàn toàn lớp text
+            } else {
+              useVideoStore.setState({ showText: false });
+            }
+          }}
+          onMouseDown={(e) => e.stopPropagation()} // Chặn kích hoạt drag khi click nút xóa
+        >
+          ✕
+        </button>
+      )}
+
       {isEditingText ? (
         <input 
           type="text"
-          autoFocus // Tự động đưa con trỏ chuột vào ô nhập liệu khi double click
+          autoFocus 
           value={textConfig.content}
           onChange={(e) => setTextConfig({...textConfig, content: e.target.value})}
-          onBlur={() => setIsEditingText(false)} // Tự động thoát chế độ sửa khi click ra vùng ngoài
+          onBlur={() => setIsEditingText(false)} 
           onKeyDown={(e) => {
-            if (e.key === 'Enter') setIsEditingText(false); // Thoát chế độ sửa nhanh khi ấn Enter
+            if (e.key === 'Enter') setIsEditingText(false); 
           }}
-          onMouseDown={(e) => e.stopPropagation()} // Chặn sự kiện drag của Box để con trỏ chuột có thể bôi đen/chọn từng chữ
+          onMouseDown={(e) => e.stopPropagation()} 
           style={{ 
             fontSize: `${textConfig.fontSize}px`, 
             color: textConfig.color,
-            width: `${Math.max(textConfig.content.length, 1)}ch` // Tự động co giãn bề ngang input theo số lượng ký tự
+            width: `${Math.max(textConfig.content.length, 1)}ch` 
           }} 
           className="font-black drop-shadow-2xl uppercase block leading-none text-center bg-transparent outline-none text-white"
         />
@@ -59,16 +82,32 @@ export const TextLayer = ({ onTextMouseDown }: TextLayerProps) => {
             fontSize: `${textConfig.fontSize}px`, 
             color: textConfig.color 
           }} 
-          className="font-black drop-shadow-2xl uppercase block leading-none whitespace-nowrap text-white pointer-events-none"
+          className="font-black drop-shadow-2xl uppercase block leading-none whitespace-nowrap text-white pointer-events-none select-none"
         >
           {textConfig.content}
         </span>
       )}
       
-      {/* Tooltip hướng dẫn tinh tế (chỉ hiện khi hover chuột vào và đang không ở chế độ sửa) */}
+      {/* NÚT CO GIÃN PHÓNG TO/THU NHỎ (RESIZE HANDLER) - Nằm ở góc dưới bên phải */}
       {!isEditingText && (
-        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-          Double-click để sửa
+        <div
+          className="absolute -bottom-2 -right-2 w-4 h-4 bg-indigo-500 border-2 border-white rounded-full cursor-se-resize z-50 shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-auto active:scale-90"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (setIsDragging) {
+              setIsDragging("text-scale"); // Kích hoạt trạng thái kéo co giãn text
+            } else {
+              useVideoStore.setState({ isDragging: "text-scale" as any });
+            }
+          }}
+        />
+      )}
+      
+      {/* Tooltip hướng dẫn tinh tế */}
+      {!isEditingText && (
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap pointer-events-none z-50">
+          Double-click để sửa chữ
         </div>
       )}
     </div>

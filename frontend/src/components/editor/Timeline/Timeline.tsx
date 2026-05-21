@@ -6,6 +6,7 @@ interface TimelineProps {
 }
 
 export const Timeline = ({ timelineRef }: TimelineProps) => {
+  const store = useVideoStore() as any;
   const {
     duration,
     currentTime,
@@ -18,9 +19,9 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
     audioConfig,
     activeSegments,       
     totalTrimmedDuration, 
-    stickers, // <-- Lấy mảng Stickers từ store
+    stickers,
     setIsDragging
-  } = useVideoStore();
+  } = store;
 
   const displayDuration = totalTrimmedDuration > 0 ? totalTrimmedDuration : duration;
   const getPos = (time: number) => (displayDuration > 0 ? (time / displayDuration) * 100 : 0);
@@ -55,8 +56,9 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
             {videoSrc && (
               <>
                 {activeSegments.length > 0 ? (
-                  activeSegments.map((seg, i) => {
-                    const previousDuration = activeSegments.slice(0, i).reduce((sum, s) => sum + s.duration, 0);
+                  // VÁ LỖI TẠI ĐÂY: Thêm kiểu dữ liệu cụ thể (any hoặc number) cho các biến lặp
+                  activeSegments.map((seg: any, i: number) => {
+                    const previousDuration = activeSegments.slice(0, i).reduce((sum: number, s: any) => sum + s.duration, 0);
                     return (
                       <div 
                         key={i}
@@ -98,22 +100,58 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
                <span>🎨</span> Stickers
              </div>
              <div className="flex-1 h-12 bg-zinc-900/50 rounded-lg border border-white/5 relative overflow-hidden">
-                {stickers.map((sticker) => (
-                  <div 
-                    key={sticker.id}
-                    className="absolute inset-y-1 bg-amber-500/20 border-x-2 border-amber-500/50 rounded shadow-md flex items-center justify-center pointer-events-none overflow-hidden" 
-                    style={{ 
-                      left: `${getPos(sticker.startTime)}%`, 
-                      right: `${100 - getPos(sticker.endTime)}%`
-                    }}
-                  >
-                    <img 
-                      src={sticker.src} 
-                      alt="sticker-thumbnail" 
-                      className="h-full object-contain opacity-70 px-1 py-1 drop-shadow-md" 
-                    />
-                  </div>
-                ))}
+                {stickers.map((sticker: any) => {
+                  const isFocused = (window as any).activeStickerId === sticker.id;
+
+                  return (
+                    <div 
+                      key={sticker.id}
+                      className={`absolute inset-y-1 bg-amber-500/20 border-x-2 rounded shadow-md flex items-center justify-between pointer-events-auto cursor-grab active:cursor-grabbing transition-colors duration-150 ${
+                        isFocused ? "border-amber-500 bg-amber-500/40 z-30" : "border-amber-500/40"
+                      }`} 
+                      style={{ 
+                        left: `${getPos(sticker.startTime)}%`, 
+                        right: `${100 - getPos(sticker.endTime)}%`
+                      }}
+                      onMouseDown={(e) => { 
+                        e.stopPropagation(); 
+                        (window as any).activeStickerId = sticker.id;
+                        setIsDragging('sticker-move'); 
+                      }}
+                    >
+                      {/* TAI NẮM TRÁI */}
+                      <div 
+                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 z-40"
+                        onMouseDown={(e) => { 
+                          e.stopPropagation(); 
+                          e.preventDefault();
+                          (window as any).activeStickerId = sticker.id;
+                          setIsDragging('sticker-start'); 
+                        }} 
+                      />
+
+                      {/* Ảnh nhỏ Thumbnail */}
+                      <div className="h-full flex items-center justify-center px-2 pointer-events-none select-none overflow-hidden mx-auto">
+                        <img 
+                          src={sticker.src} 
+                          alt="sticker-thumb" 
+                          className="h-4 w-4 object-contain opacity-80 drop-shadow" 
+                        />
+                      </div>
+
+                      {/* TAI NẮM PHẢI */}
+                      <div 
+                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 z-40"
+                        onMouseDown={(e) => { 
+                          e.stopPropagation(); 
+                          e.preventDefault();
+                          (window as any).activeStickerId = sticker.id;
+                          setIsDragging('sticker-end'); 
+                        }} 
+                      />
+                    </div>
+                  );
+                })}
              </div>
           </div>
         )}

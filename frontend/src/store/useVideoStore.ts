@@ -1,5 +1,5 @@
+// src/store/useVideoStore.ts
 import { create } from 'zustand';
-// Dòng số 2: Đã thêm StickerElement vào cụm import từ file types
 import { TextConfig, AudioConfig, ActiveTab, DragType, StickerElement } from '../types/editor';
 
 interface VideoSegment {
@@ -7,8 +7,6 @@ interface VideoSegment {
   end: number;
   duration: number;
 }
-
-// Đoạn "export interface StickerElement" cũ ở đây đã được xóa bỏ vì đã import từ file ngoài
 
 interface VideoState {
   // --- MEDIA STATE ---
@@ -33,7 +31,7 @@ interface VideoState {
   activeSegments: VideoSegment[];
   trimStart: number;
   trimEnd: number;
-  textConfig: TextConfig;
+  textConfig: TextConfig; // Quay về cấu trúc Object 1 dòng chữ duy nhất gốc
   audioConfig: AudioConfig;
   isDragging: DragType;
 
@@ -57,9 +55,11 @@ interface VideoState {
   
   // --- STICKER ACTIONS ---
   setStickers: (stickers: StickerElement[]) => void;
+  addAutoStickers: (autoStickers: StickerElement[]) => void;
   updateSticker: (id: string, updates: Partial<StickerElement>) => void;
   removeSticker: (id: string) => void;
 
+  // --- TRIM & TEXT ACTIONS PHỤC HỒI ---
   setActiveSegments: (segments: {start: number, end: number}[]) => void;
   setTrimStart: (time: number) => void;
   setTrimEnd: (time: number) => void;
@@ -74,7 +74,7 @@ interface VideoState {
 }
 
 export const useVideoStore = create<VideoState>((set) => ({
-  // Default values
+  // Default values ban đầu của bạn
   videoSrc: null,
   videoFile: null,
   audioSrc: null,
@@ -100,7 +100,6 @@ export const useVideoStore = create<VideoState>((set) => ({
   },
   audioConfig: { start: 0, end: 5, volume: 1.0 },
   
-  // History initial state
   history: [],
   historyIndex: -1,
 
@@ -129,8 +128,18 @@ export const useVideoStore = create<VideoState>((set) => ({
   setIsLandscape: (landscape) => set({ isLandscape: landscape }),
   setSubtitles: (subs) => set({ subtitles: subs }),
 
-  // --- STICKER LOGIC ---
+  // --- STICKER ACTIONS ---
   setStickers: (stickers) => set({ stickers }),
+  
+  // Đánh chặn Auto Mix bảo vệ Custom Sticker cũ cho bạn
+  addAutoStickers: (autoStickers) => set((state) => {
+    const currentStickers = state.stickers || [];
+    const merged = [...currentStickers, ...autoStickers];
+    const uniqueStickers = merged.filter((sticker, index, self) =>
+      self.findIndex((s) => s.id === sticker.id) === index
+    );
+    return { stickers: uniqueStickers };
+  }),
   
   updateSticker: (id, updates) => set((state) => ({
     stickers: state.stickers.map((s) => 
@@ -142,6 +151,7 @@ export const useVideoStore = create<VideoState>((set) => ({
     stickers: state.stickers.filter((s) => s.id !== id)
   })),
 
+  // --- CO-LOGIC ACTIONS ---
   setActiveSegments: (segments) => {
     const processed = segments.map(s => ({
       start: s.start,
