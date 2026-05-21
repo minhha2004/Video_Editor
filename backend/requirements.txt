@@ -14,3 +14,4 @@ numpy
 faster-whisper
 edge-tts
 nltk
+rembg

@@ -8,29 +8,43 @@ All core processing components are decoupled via a FastAPI backend to ensure sca
 
 ## Features
 
-* Auto AI Subtitle (STT) with precise word-level timestamps using Faster-Whisper
-* AI Voiceover (TTS) generating natural-sounding speech via Edge-TTS (US-Ava Neural)
-* Smart Cut Tool featuring amplitude-based silence removal and multi-modal highlight detection
-* Auto-Mix Stickers using NLP-driven contextual insertion via NLTK Lemmatization
-* AI Image-to-Sticker background remover leveraging integrated web services for seamless mask stripping
-* Interactive Editor GUI supporting live translation, coordinate dragging, and scale modification built on Next.js
-* High-Performance Renderer utilizing a MoviePy-based engine with hardware-acceleration support
+* **Auto AI Subtitle (STT):** Precise word-level timestamps using Faster-Whisper.
+* **AI Voiceover (TTS):** Generating natural-sounding speech via Edge-TTS (US-Ava Neural).
+* **Smart Cut Tool:** Amplitude-based silence removal and multi-modal highlight detection.
+* **Auto-Mix Stickers:** NLP-driven contextual insertion via NLTK Lemmatization with smart history blending to protect custom user graphics.
+* **Offline AI Background Remover:** Local mask stripping leveraging `rembg` to convert custom images into transparent stickers instantly without external API dependencies.
+* **Interactive Preview Layer Canvas:** Drag-and-drop coordinate adjustment, quick deletion overlays, and real-time pointer bounding-box resizing for text and sticker elements.
+* **High-Performance Renderer:** Multi-threaded MoviePy-based video rendering engine.
 
 ---
 
 ## Dependencies
 
+### Backend Dependencies (Python Stack)
 | Library / Tool | Version | Purpose |
 | :--- | :--- | :--- |
-| FFmpeg | system | Core media demuxing and stream encoding |
-| ImageMagick | system | Font rasterization for text overlays |
-| Faster-Whisper | latest | Word-level audio transcription (STT) |
-| Edge-TTS | latest | Neural text-to-speech generation |
-| MoviePy | latest | Composite video and audio rendering |
-| OpenCV / Pydub | latest | Visual frame differencing & audio amplitude analysis |
-| NLTK | latest | Natural Language Processing (Lemmatization) |
-| FastAPI | latest | Backend REST API framework |
-| Next.js | 14+ | Frontend React framework and routing |
+| **FastAPI** | latest | High-performance asynchronous web framework for API endpoints |
+| **Uvicorn** | latest | Lightning-fast ASGI server implementation to run FastAPI |
+| **MoviePy** | latest | Script-based video editing engine for multi-track composition & rendering |
+| **Faster-Whisper** | latest | Advanced AI Speech-to-Text pipeline for word-level transcriptions |
+| **Edge-TTS** | latest | Microsoft Neural text-to-speech engine for lifelike voiceovers |
+| **Rembg** | latest | Offline deep learning model for local image background removal |
+| **OpenCV (cv2)** | latest | Computer vision library for frame manipulation and visual analysis |
+| **Pydub** | latest | Audio processing utility used for amplitude-based silence detection |
+| **NLTK** | latest | Natural Language Toolkit used for contextual auto-sticker keyword extraction |
+
+### Frontend Dependencies (JavaScript/TypeScript Stack)
+| Library / Tool | Version | Purpose |
+| :--- | :--- | :--- |
+| **Next.js** | 14 | React framework for server-side rendering and client-side routing |
+| **Zustand** | 4 | Lightweight, centralized state management container for temporal assets tracking |
+| **Tailwind CSS** | latest | Utility-first CSS framework for dark-themed, responsive timeline UI grids |
+
+### System-Level Dependencies (Required)
+| Tool | Installation | Purpose |
+| :--- | :--- | :--- |
+| **FFmpeg** | System Env | Core multimedia framework used globally for demuxing, decoding, and encoding |
+| **ImageMagick** | System Env | Binary backend required by MoviePy for rasterizing rich text overlays on frames |
 
 ---
 
