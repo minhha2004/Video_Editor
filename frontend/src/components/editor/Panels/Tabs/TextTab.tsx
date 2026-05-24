@@ -1,4 +1,3 @@
-// src/components/editor/Panels/Tabs/TextTab.tsx
 "use client";
 
 import { useState } from 'react';
@@ -6,7 +5,6 @@ import { useVideoStore } from '../../../../store/useVideoStore';
 import { aiService } from '../../../../services/aiService';
 
 export const TextTab = () => {
-  // Trích xuất các state và hàm cần thiết cho Text Tab độc bản từ Store gốc
   const store = useVideoStore() as any;
   const {
     audioSrc, 
@@ -17,6 +15,7 @@ export const TextTab = () => {
     setShowText, 
     setTextConfig, 
     setSubtitles,
+    clearSubtitles, // Action mới
     saveHistory
   } = store;
 
@@ -40,17 +39,19 @@ export const TextTab = () => {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-      {/* HEADER ĐỒNG BỘ: Chữ đứng thẳng, đổi màu text-zinc-400 khớp tab Asset */}
-      <h2 className="text-[11px] font-black text-zinc-400 uppercase mb-6 tracking-[0.2em]">
-        Text & Subtitles
-      </h2>
+    <div className="space-y-4 animate-in fade-in duration-200">
+      {/* Title */}
+      <div>
+        <h3 className="text-xs font-black uppercase tracking-wider text-zinc-400">
+          Text and Subtitles
+        </h3>
+      </div>
       
       {/* Nút AI Auto Subtitle */}
       <button 
         onClick={handleAutoSubtitle} 
         disabled={(!audioSrc && !videoSrc) || isTranscribing} 
-        className="w-full py-4 mb-4 bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 text-white shadow-lg rounded-xl text-[11px] font-black uppercase tracking-[0.15em] hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-50 disabled:bg-zinc-800 disabled:from-zinc-800 disabled:to-zinc-800"
+        className="w-full py-4 mb-4 bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 text-white shadow-lg rounded-xl text-[11px] font-black uppercase tracking-[0.15em] hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-50"
       >
         {isTranscribing ? (
           <>
@@ -62,20 +63,35 @@ export const TextTab = () => {
         )}
       </button>
       
-      {/* Danh sách Subtitles kết quả từ AI */}
+      {/* Danh sách Subtitles và Nút Xoá */}
       {subtitles.length > 0 && (
-        <div className="mb-6 p-3 bg-white/5 rounded-xl border border-white/5 max-h-48 overflow-y-auto custom-scrollbar">
-          <p className="text-[9px] font-black text-indigo-400 uppercase mb-3 tracking-widest italic">Data Found</p>
-          {subtitles.map((s: any, i: number) => (
-            <div key={i} className="mb-3 last:mb-0 border-b border-white/5 pb-2">
-              <p className="text-[10px] text-zinc-200 leading-snug font-medium">{s.text || "Voice Segment"}</p>
-              <p className="text-[8px] text-zinc-500 font-mono mt-1 uppercase">{s.start.toFixed(1)}s → {s.end.toFixed(1)}s</p>
-            </div>
-          ))}
+        <div className="mb-6 p-3 bg-white/5 rounded-xl border border-white/5">
+          <div className="flex justify-between items-center mb-3">
+             <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest italic">Data Found</p>
+             <button 
+                onClick={() => {
+                  if(confirm("Bạn có chắc muốn xoá toàn bộ Subtitle?")) {
+                    saveHistory();
+                    clearSubtitles();
+                  }
+                }}
+                className="text-[8px] text-rose-500 font-bold uppercase hover:underline"
+             >
+                🗑️ Clear All
+             </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+            {subtitles.map((s: any, i: number) => (
+              <div key={i} className="mb-3 last:mb-0 border-b border-white/5 pb-2">
+                <p className="text-[10px] text-zinc-200 leading-snug font-medium">{s.text || "Voice Segment"}</p>
+                <p className="text-[8px] text-zinc-500 font-mono mt-1 uppercase">{s.start.toFixed(1)}s → {s.end.toFixed(1)}s</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       
-      {/* Nút Standard: Thêm/Xóa text thủ công */}
+      {/* Nút Heading Thủ Công */}
       <button 
         onClick={() => {
           if (saveHistory) saveHistory();
@@ -87,10 +103,10 @@ export const TextTab = () => {
             : 'bg-indigo-600 text-white hover:bg-indigo-500'
         }`}
       >
-        {showText ? "- Remove Layer" : "+ Add Heading"}
+        {showText ? "- Remove Heading" : "+ Add Heading"}
       </button>
       
-      {/* Form tùy chỉnh Text gốc */}
+      {/* Form tùy chỉnh Heading */}
       {showText && textConfig && (
         <div className="space-y-6 bg-white/5 p-5 rounded-2xl border border-white/5">
           <input 

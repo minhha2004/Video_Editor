@@ -12,11 +12,15 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@google/generative-ai": "^0.24.1",
+    "@remotion/cli": "^4.0.465",
+    "@remotion/media-utils": "^4.0.465",
+    "@remotion/player": "^4.0.465",
     "gtts": "^0.2.1",
     "next": "16.2.2",
     "openai": "^6.34.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "remotion": "^4.0.465"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -60,9 +60,14 @@ export const MediaTab = () => {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-      <h2 className="text-[11px] font-black text-zinc-500 uppercase mb-6 tracking-[0.2em] italic">Media Library</h2>
-      
+    <div className="space-y-4 animate-in fade-in duration-200">
+      {/* Title */}
+      <div>
+        <h3 className="text-xs font-black uppercase tracking-wider text-zinc-400">
+          Media Library and AI Cut
+        </h3>
+      </div>
+  
       {/* Nút Standard */}
       <button 
         onClick={() => document.getElementById('vid-in')?.click()} 

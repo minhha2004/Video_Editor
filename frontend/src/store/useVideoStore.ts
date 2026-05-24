@@ -31,7 +31,7 @@ interface VideoState {
   activeSegments: VideoSegment[];
   trimStart: number;
   trimEnd: number;
-  textConfig: TextConfig; // Quay về cấu trúc Object 1 dòng chữ duy nhất gốc
+  textConfig: TextConfig;
   audioConfig: AudioConfig;
   isDragging: DragType;
 
@@ -52,6 +52,7 @@ interface VideoState {
   setIsProcessing: (processing: boolean) => void;
   setIsLandscape: (landscape: boolean) => void;
   setSubtitles: (subs: any[]) => void;
+  clearSubtitles: () => void; // Action mới để xoá sub
   
   // --- STICKER ACTIONS ---
   setStickers: (stickers: StickerElement[]) => void;
@@ -59,7 +60,7 @@ interface VideoState {
   updateSticker: (id: string, updates: Partial<StickerElement>) => void;
   removeSticker: (id: string) => void;
 
-  // --- TRIM & TEXT ACTIONS PHỤC HỒI ---
+  // --- TRIM & TEXT ACTIONS ---
   setActiveSegments: (segments: {start: number, end: number}[]) => void;
   setTrimStart: (time: number) => void;
   setTrimEnd: (time: number) => void;
@@ -74,7 +75,6 @@ interface VideoState {
 }
 
 export const useVideoStore = create<VideoState>((set) => ({
-  // Default values ban đầu của bạn
   videoSrc: null,
   videoFile: null,
   audioSrc: null,
@@ -103,7 +103,6 @@ export const useVideoStore = create<VideoState>((set) => ({
   history: [],
   historyIndex: -1,
 
-  // Setters
   setVideo: (file, url) => set({ 
     videoFile: file, 
     videoSrc: url, 
@@ -127,11 +126,10 @@ export const useVideoStore = create<VideoState>((set) => ({
   setIsProcessing: (processing) => set({ isProcessing: processing }),
   setIsLandscape: (landscape) => set({ isLandscape: landscape }),
   setSubtitles: (subs) => set({ subtitles: subs }),
+  clearSubtitles: () => set({ subtitles: [] }), // Logic xoá sub
 
-  // --- STICKER ACTIONS ---
   setStickers: (stickers) => set({ stickers }),
   
-  // Đánh chặn Auto Mix bảo vệ Custom Sticker cũ cho bạn
   addAutoStickers: (autoStickers) => set((state) => {
     const currentStickers = state.stickers || [];
     const merged = [...currentStickers, ...autoStickers];
@@ -151,7 +149,6 @@ export const useVideoStore = create<VideoState>((set) => ({
     stickers: state.stickers.filter((s) => s.id !== id)
   })),
 
-  // --- CO-LOGIC ACTIONS ---
   setActiveSegments: (segments) => {
     const processed = segments.map(s => ({
       start: s.start,
@@ -174,7 +171,6 @@ export const useVideoStore = create<VideoState>((set) => ({
   setAudioConfig: (config) => set({ audioConfig: config }),
   setIsDragging: (dragType) => set({ isDragging: dragType }),
 
-  // --- HISTORY LOGIC ---
   saveHistory: () => set((state) => {
     const snapshot = {
       activeSegments: JSON.parse(JSON.stringify(state.activeSegments)),
