@@ -168,23 +168,28 @@ async def api_render(
     config: str = Form(...)
 ):
     """
-    Render video cuối cùng bằng MoviePy.
+    API Render video cuối cùng bằng MoviePy.
+    Nhận video thô, file audio phụ trợ (nếu có) và chuỗi JSON cấu hình sạch từ Frontend.
     """
     job_id = str(uuid.uuid4())
     v_path = os.path.join(UPLOAD_DIR, f"{job_id}_v.mp4")
     a_path = os.path.join(UPLOAD_DIR, f"{job_id}_a.mp3") if audio else None
     out_path = os.path.join(EXPORT_DIR, f"{job_id}_final.mp4")
 
+    # Lưu tạm tệp video upload từ client
     with open(v_path, "wb") as f:
         shutil.copyfileobj(video.file, f)
         
+    # Lưu tạm tệp âm thanh lồng ghép từ client (nếu có)
     if audio:
         with open(a_path, "wb") as f:
             shutil.copyfileobj(audio.file, f)
 
     try:
+        # Gọi trực tiếp lõi xử lý kết xuất video MoviePy (đã được fix triệt để lỗi '50%')
         process_video_export(v_path, a_path, config, out_path)
         
+        # Kiểm tra file đầu ra và trả về luồng stream video tải về cho frontend
         if os.path.exists(out_path):
             return FileResponse(out_path, media_type="video/mp4", filename="short_video_export.mp4")
         else:
@@ -194,6 +199,7 @@ async def api_render(
         print(f"Render Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        # Đảm bảo dọn dẹp sạch tệp tạm trong uploads/ để tránh tràn đĩa cứng
         for p in [v_path, a_path]:
             if p and os.path.exists(p):
                 os.remove(p)
