@@ -6,6 +6,7 @@ import { Timeline } from '../src/components/editor/Timeline/Timeline';
 import { useVideoStore } from '../src/store/useVideoStore'; 
 import { useTimelineDrag } from '../src/hooks/useTimelineDrag';
 import { aiService } from '../src/services/aiService';
+import ExportPublisher from '../src/components/editor/ExportPublisher'; // Import component đã tách
 
 // Hàm định dạng thời gian MM:SS chuyên nghiệp
 const formatTime = (seconds: number) => {
@@ -51,32 +52,6 @@ export default function Home() {
     return () => window.removeEventListener('mouseup', handleUp);
   }, []);
 
-  const handleExport = async () => {
-    if (!store.videoFile) return;
-    store.setIsProcessing(true);
-    const formData = new FormData();
-    formData.append('video', store.videoFile);
-    
-    const metadata = {
-      trimStart: store.trimStart, 
-      trimEnd: store.trimEnd,
-      activeSegments: store.activeSegments,
-      isLandscape: store.isLandscape, 
-      isVideoMuted: store.isVideoMuted,
-      text: store.showText ? store.textConfig : null,
-      subtitles: store.subtitles
-    };
-    formData.append('config', JSON.stringify(metadata));
-
-    try {
-      const blob = await aiService.renderVideo(formData);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `export_${Date.now()}.mp4`; a.click();
-    } catch (err) { alert("Export failed!"); } 
-    finally { store.setIsProcessing(false); }
-  };
-
   return (
     <div className="h-screen bg-[#0c0c0e] text-zinc-300 flex flex-col font-sans overflow-hidden select-none" onMouseMove={handleDrag}>
       
@@ -86,13 +61,8 @@ export default function Home() {
           <div className="w-7 h-7 bg-indigo-600 rounded flex items-center justify-center font-black text-white text-[11px]">S</div>
           <span className="text-[12px] font-bold uppercase text-zinc-300 tracking-wider">Short Editor Pro</span>
         </div>
-        <button 
-          onClick={handleExport} 
-          disabled={store.isProcessing || !store.videoSrc} 
-          className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 px-6 py-2 rounded text-[11px] font-bold text-white uppercase tracking-widest transition-all"
-        >
-            {store.isProcessing ? "Processing..." : "Export"}
-        </button>
+        {/* Vị trí nút cũ được thay thế bằng Component riêng biệt đã bao bọc full tính năng */}
+        <ExportPublisher />
       </header>
 
       <div className="flex-1 flex overflow-hidden">

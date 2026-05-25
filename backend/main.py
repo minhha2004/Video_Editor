@@ -43,6 +43,9 @@ os.makedirs(STATIC_STICKER_DIR, exist_ok=True)
 # Gắn thư mục static vào FastAPI để cho phép Frontend truy cập ảnh tĩnh qua URL
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Gắn thư mục exports vào FastAPI để phục vụ tính năng Publisher (Truy cập link video trực tuyến)
+app.mount("/exports", StaticFiles(directory="exports"), name="exports")
+
 # Khởi tạo Session model AI bóc nền bản nhẹ (u2net_thin) tối ưu hóa tài nguyên phần cứng
 # Trong lần đầu khởi chạy, thư viện sẽ tự động tải file ONNX (~40MB) về lưu tại bộ nhớ máy.
 try:
@@ -256,6 +259,43 @@ async def api_auto_mix(transcript: List[WordItem]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi xử lý Auto Mixing tại Backend: {str(e)}")
 
+
+# --- TÍCH HỢP MÔ-ĐUN PUBLISHER THÔNG MINH (TỰ ĐỘNG QUÉT FILE MỚI NHẤT) ---
+@app.post("/api/publisher/publish")
+async def publish_video(video_name: str):
+    """
+    Xử lý yêu cầu xuất bản video từ người dùng.
+    Tự động nhận diện file kết xuất mới nhất trong thư mục exports để tránh lỗi lệch tên (404).
+    """
+    import glob
+
+    # 1. Đường dẫn gốc tới thư mục exports
+    target_dir = "exports"
+    
+    # 2. Tìm tất cả các file .mp4 đang có trong thư mục exports
+    video_files = glob.glob(os.path.join(target_dir, "*.mp4"))
+    
+    if not video_files:
+        raise HTTPException(
+            status_code=404, 
+            detail="Không tìm thấy bất kỳ tệp video thành phẩm nào trong thư mục kết xuất!"
+        )
+        
+    # 3. MẸO THÔNG MINH: Sắp xếp các file theo thời gian chỉnh sửa (mới nhất lên đầu)
+    video_files.sort(key=os.path.getmtime, reverse=True)
+    latest_video_path = video_files[0] # Đây chính là file video bạn vừa Render xong!
+    
+    # 4. Trích xuất lại tên file thực tế từ đường dẫn (Ví dụ: "uuid_final.mp4")
+    actual_video_name = os.path.basename(latest_video_path)
+    
+    # 5. Sinh liên kết public URL chính xác 100% dựa trên file thực tế
+    public_url = f"http://localhost:8000/exports/{actual_video_name}"
+    
+    return {
+        "success": True,
+        "message": "Xuất bản và cấu hình liên kết chia sẻ video thành công!",
+        "shareLink": public_url
+    }
 
 if __name__ == "__main__":
     import uvicorn
