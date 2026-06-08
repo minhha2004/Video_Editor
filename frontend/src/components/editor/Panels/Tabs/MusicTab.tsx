@@ -5,6 +5,7 @@ import { aiService } from '../../../../services/aiService';
 export const MusicTab = () => {
   const {
     audioSrc,
+    audioFile,
     audioConfig,
     setAudioConfig,
     setAudio,
@@ -14,6 +15,17 @@ export const MusicTab = () => {
 
   const [aiText, setAiText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const hasTtsAudio = audioSrc && audioFile?.name === "ai-voice.mp3";
+  const hasUploadedAudio = audioSrc && !hasTtsAudio;
+
+  const clearAudio = () => {
+    if (!audioSrc) return;
+    saveHistory();
+    setAudio(null, null);
+    setAudioDuration(0);
+    setAudioConfig({ ...audioConfig, start: 0, end: 0 });
+  };
 
   const handleGenAIVoice = async () => {
     if (!aiText) return;
@@ -30,7 +42,7 @@ export const MusicTab = () => {
         setAudio(file, url);
         setAiText(""); 
       };
-    } catch (err) {
+    } catch {
       alert("Lỗi TTS!");
     } finally {
       setIsGenerating(false);
@@ -69,16 +81,49 @@ export const MusicTab = () => {
         className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-[11px] text-white outline-none h-24 mb-4" 
       />
       
-      {/* Nút Standard (đổi màu theo state) */}
+      {/* Dữ liệu TTS và nút xoá: đồng bộ style với Subtitle trong Text tab */}
+      {hasTtsAudio && (
+        <div className="mb-6 p-3 bg-white/5 rounded-xl border border-white/5">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest italic">Data Found</p>
+            <button 
+              onClick={() => {
+                if(confirm("Bạn có chắc muốn xoá toàn bộ TTS?")) {
+                  clearAudio();
+                }
+              }}
+              className="text-[8px] text-rose-500 font-bold uppercase hover:underline"
+            >
+              🗑️ Clear All
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+            <div className="mb-3 last:mb-0 border-b border-white/5 pb-2">
+              <p className="text-[10px] text-zinc-200 leading-snug font-medium">AI Voice Segment</p>
+              <p className="text-[8px] text-zinc-500 font-mono mt-1 uppercase">{audioConfig.start.toFixed(1)}s → {audioConfig.end.toFixed(1)}s</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nút Upload Audio: độc lập với TTS, toggle giống Add Heading */}
       <button 
-        onClick={() => audioSrc ? setAudio(null, null) : document.getElementById('aud-in')?.click()} 
+        onClick={() => {
+          if (hasUploadedAudio) {
+            if(confirm("Bạn có chắc muốn xoá audio đã upload?")) {
+              clearAudio();
+            }
+            return;
+          }
+          document.getElementById('aud-in')?.click();
+        }} 
         className={`w-full py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all mb-3 active:scale-[0.98] ${
-          audioSrc 
-            ? 'border border-rose-500/30 text-rose-500 bg-rose-500/10 hover:bg-rose-500/20' 
+          hasUploadedAudio 
+            ? 'bg-rose-500/10 border border-rose-500/30 text-rose-500 hover:bg-rose-500/20' 
             : 'bg-indigo-600 text-white hover:bg-indigo-500'
         }`}
       >
-        {audioSrc ? "- Remove Audio" : "+ Upload Audio"}
+        {hasUploadedAudio ? "- Remove Audio" : "+ Upload Audio"}
       </button>
       
       <input id="aud-in" type="file" className="hidden" accept="audio/*" onChange={(e) => {
@@ -87,6 +132,7 @@ export const MusicTab = () => {
           const url = URL.createObjectURL(file);
           const t = new Audio(url);
           t.onloadedmetadata = () => { 
+            saveHistory();
             setAudioDuration(t.duration); 
             setAudioConfig({ ...audioConfig, end: t.duration });
             setAudio(file, url); 

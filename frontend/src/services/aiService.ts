@@ -43,7 +43,14 @@ export const aiService = {
       data.subtitles = data.subtitles.map((sub: any) => ({
         ...sub,
         start: Number(sub.start) + SYNC_OFFSET,
-        end: Number(sub.end) + SYNC_OFFSET
+        end: Number(sub.end) + SYNC_OFFSET,
+        words: Array.isArray(sub.words)
+          ? sub.words.map((word: any) => ({
+              ...word,
+              start: Number(word.start) + SYNC_OFFSET,
+              end: Number(word.end) + SYNC_OFFSET
+            }))
+          : sub.words
       }));
     }
     // ----------------------------------------------
@@ -54,9 +61,12 @@ export const aiService = {
   /**
    * AI tự động phát hiện đoạn Highlight hay nhất
    */
-  detectHighlight: async (file: File) => {
+  detectHighlight: async (file: File, duration?: number) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (duration && duration > 0) {
+      formData.append('duration', String(duration));
+    }
     const response = await fetch(`${API_BASE}/ai/detect-highlight`, {
       method: 'POST',
       body: formData,
@@ -84,19 +94,11 @@ export const aiService = {
    * CHUẨN HÓA: Trả về kết quả thô sạch từ AI để nhường quyền xử lý gộp mảng an toàn cho Zustand Store
    */
   autoMixStickers: async (transcript: any[]) => {
-    // Lấy dữ liệu thời gian chính xác của TỪNG CHỮ thay vì cả câu
-    const payload: any[] = [];
-    
-    transcript.forEach(segment => {
-      if (segment.words && segment.words.length > 0) {
-        // Lấy đúng mốc thời gian từ đó được phát âm
-        segment.words.forEach((w: any) => {
-          payload.push({ word: w.word, start: w.start, end: w.end });
-        });
-      } else {
-        payload.push({ word: segment.text, start: segment.start, end: segment.end });
-      }
-    });
+    const payload = transcript.map(segment => ({
+      text: segment.text || segment.word || "",
+      start: segment.start,
+      end: segment.end
+    }));
 
     const response = await fetch(`${API_BASE}/ai/auto-mix`, {
       method: 'POST',

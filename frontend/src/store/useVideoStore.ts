@@ -1,6 +1,6 @@
 // src/store/useVideoStore.ts
 import { create } from 'zustand';
-import { TextConfig, AudioConfig, ActiveTab, DragType, StickerElement } from '../types/editor';
+import { TextConfig, TextElement, AudioConfig, ActiveTab, DragType, StickerElement } from '../types/editor';
 
 interface VideoSegment {
   start: number;
@@ -28,6 +28,7 @@ interface VideoState {
   // --- CONFIG & AI STATE ---
   subtitles: any[];
   stickers: StickerElement[];
+  texts: TextElement[];
   activeSegments: VideoSegment[];
   trimStart: number;
   trimEnd: number;
@@ -37,6 +38,7 @@ interface VideoState {
 
   // --- HISTORY (UNDO/REDO) ---
   history: any[];
+  redoHistory: any[];
   historyIndex: number;
 
   // --- ACTIONS ---
@@ -59,6 +61,10 @@ interface VideoState {
   addAutoStickers: (autoStickers: StickerElement[]) => void;
   updateSticker: (id: string, updates: Partial<StickerElement>) => void;
   removeSticker: (id: string) => void;
+  addText: () => void;
+  updateText: (id: string, updates: Partial<TextElement>) => void;
+  removeText: (id: string) => void;
+  setTexts: (texts: TextElement[]) => void;
 
   // --- TRIM & TEXT ACTIONS ---
   setActiveSegments: (segments: {start: number, end: number}[]) => void;
@@ -73,6 +79,43 @@ interface VideoState {
   undo: () => void;
   redo: () => void;
 }
+
+const createHistorySnapshot = (state: VideoState) => ({
+  activeSegments: JSON.parse(JSON.stringify(state.activeSegments)),
+  totalTrimmedDuration: state.totalTrimmedDuration,
+  trimStart: state.trimStart,
+  trimEnd: state.trimEnd,
+  textConfig: { ...state.textConfig },
+  texts: JSON.parse(JSON.stringify(state.texts)),
+  audioConfig: { ...state.audioConfig },
+  audioSrc: state.audioSrc,
+  audioFile: state.audioFile,
+  audioDuration: state.audioDuration,
+  isVideoMuted: state.isVideoMuted,
+  isLandscape: state.isLandscape,
+  subtitles: JSON.parse(JSON.stringify(state.subtitles)),
+  stickers: JSON.parse(JSON.stringify(state.stickers)), 
+  showText: state.showText
+});
+
+const undoableDragTypes = new Set([
+  'trim-start',
+  'trim-end',
+  'video-move',
+  'text-start',
+  'text-end',
+  'text-move',
+  'audio-start',
+  'audio-end',
+  'audio-move',
+  'text-pos',
+  'text-scale',
+  'sticker-start',
+  'sticker-end',
+  'sticker-move',
+  'sticker-pos',
+  'sticker-scale'
+]);
 
 export const useVideoStore = create<VideoState>((set) => ({
   videoSrc: null,
@@ -91,6 +134,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   activeTab: 'media',
   subtitles: [],
   stickers: [],
+  texts: [],
   activeSegments: [],
   trimStart: 0,
   trimEnd: 0,
@@ -101,6 +145,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   audioConfig: { start: 0, end: 5, volume: 1.0 },
   
   history: [],
+  redoHistory: [],
   historyIndex: -1,
 
   setVideo: (file, url) => set({ 
@@ -111,7 +156,9 @@ export const useVideoStore = create<VideoState>((set) => ({
     activeSegments: [], 
     totalTrimmedDuration: 0,
     stickers: [],
+    texts: [],
     history: [],
+    redoHistory: [],
     historyIndex: -1 
   }),
   
@@ -149,6 +196,56 @@ export const useVideoStore = create<VideoState>((set) => ({
     stickers: state.stickers.filter((s) => s.id !== id)
   })),
 
+  addText: () => set((state) => {
+    const duration = state.totalTrimmedDuration > 0 ? state.totalTrimmedDuration : state.duration;
+    const start = Math.max(0, state.currentTime || 0);
+    const end = Math.min(duration || 5, start + 5);
+    const text: TextElement = {
+      id: `text_${Date.now().toString(36)}`,
+      type: 'text',
+      content: 'SHORT EDITOR',
+      fontSize: 40,
+      x: 50,
+      y: 50,
+      color: '#ffffff',
+      start,
+      end: end > start ? end : start + 5,
+      layer: 60
+    };
+
+    return {
+      texts: [...state.texts, text],
+      showText: true,
+      textConfig: text
+    };
+  }),
+
+  updateText: (id, updates) => set((state) => {
+    const texts = state.texts.map((text) => 
+      text.id === id ? { ...text, ...updates } : text
+    );
+    const activeText = texts.find((text) => text.id === id);
+    return {
+      texts,
+      textConfig: activeText ? activeText : state.textConfig
+    };
+  }),
+
+  removeText: (id) => set((state) => {
+    const texts = state.texts.filter((text) => text.id !== id);
+    return {
+      texts,
+      showText: texts.length > 0,
+      textConfig: texts[0] || state.textConfig
+    };
+  }),
+
+  setTexts: (texts) => set((state) => ({
+    texts,
+    showText: texts.length > 0,
+    textConfig: texts[0] || state.textConfig
+  })),
+
   setActiveSegments: (segments) => {
     const processed = segments.map(s => ({
       start: s.start,
@@ -169,50 +266,65 @@ export const useVideoStore = create<VideoState>((set) => ({
   setTrimEnd: (time) => set({ trimEnd: time }),
   setTextConfig: (config) => set({ textConfig: config }),
   setAudioConfig: (config) => set({ audioConfig: config }),
-  setIsDragging: (dragType) => set({ isDragging: dragType }),
+  setIsDragging: (dragType) => set((state) => {
+    const shouldSaveDragStart = Boolean(
+      dragType &&
+      state.isDragging === null &&
+      undoableDragTypes.has(String(dragType))
+    );
+
+    if (!shouldSaveDragStart) return { isDragging: dragType };
+
+    const newHistory = [...state.history, createHistorySnapshot(state)];
+    return {
+      isDragging: dragType,
+      history: newHistory,
+      redoHistory: [],
+      historyIndex: newHistory.length - 1
+    };
+  }),
 
   saveHistory: () => set((state) => {
-    const snapshot = {
-      activeSegments: JSON.parse(JSON.stringify(state.activeSegments)),
-      totalTrimmedDuration: state.totalTrimmedDuration,
-      trimStart: state.trimStart,
-      trimEnd: state.trimEnd,
-      textConfig: { ...state.textConfig },
-      subtitles: [...state.subtitles],
-      stickers: JSON.parse(JSON.stringify(state.stickers)), 
-      showText: state.showText
-    };
-    
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const snapshot = createHistorySnapshot(state);
+    const newHistory = [...state.history, snapshot];
     return {
-      history: [...newHistory, snapshot],
-      historyIndex: newHistory.length
+      history: newHistory,
+      redoHistory: [],
+      historyIndex: newHistory.length - 1
     };
   }),
 
   undo: () => set((state) => {
-    if (state.historyIndex < 0) return {};
-    
-    const prevIndex = state.historyIndex - 1;
-    if (prevIndex < -1) return {};
+    if (state.history.length === 0) return {};
 
-    if (prevIndex === -1) {
-      return {
-        activeSegments: [],
-        totalTrimmedDuration: 0,
-        trimStart: 0,
-        trimEnd: 0,
-        stickers: [], 
-        historyIndex: -1
-      };
-    }
+    const previousSnapshot = state.history[state.history.length - 1];
+    const currentSnapshot = createHistorySnapshot(state);
+    const newHistory = state.history.slice(0, -1);
 
-    return { ...state.history[prevIndex], historyIndex: prevIndex };
+    return {
+      ...previousSnapshot,
+      history: newHistory,
+      redoHistory: [currentSnapshot, ...state.redoHistory],
+      historyIndex: newHistory.length - 1,
+      isDragging: null,
+      isPlaying: false
+    };
   }),
 
   redo: () => set((state) => {
-    if (state.historyIndex >= state.history.length - 1) return {};
-    const nextIndex = state.historyIndex + 1;
-    return { ...state.history[nextIndex], historyIndex: nextIndex };
+    if (state.redoHistory.length === 0) return {};
+
+    const nextSnapshot = state.redoHistory[0];
+    const currentSnapshot = createHistorySnapshot(state);
+    const newHistory = [...state.history, currentSnapshot];
+
+    return {
+      ...nextSnapshot,
+      history: newHistory,
+      redoHistory: state.redoHistory.slice(1),
+      historyIndex: newHistory.length - 1,
+      isDragging: null,
+      isPlaying: false
+    };
   }),
 }));

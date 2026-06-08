@@ -2,7 +2,7 @@ import uuid
 import re
 import nltk
 from nltk.stem import WordNetLemmatizer
-import ssl 
+import ssl
 
 # --- BỎ QUA KIỂM TRA SSL TRÊN MACOS ---
 try:
@@ -12,76 +12,149 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-# Tải data cho NLTK
 try:
     nltk.data.find('corpora/wordnet')
 except LookupError:
-    nltk.download('wordnet', quiet=True)
-    nltk.download('omw-1.4', quiet=True)
+    HAS_WORDNET = False
+else:
+    HAS_WORDNET = True
 
 lemmatizer = WordNetLemmatizer()
 
-# Bộ từ khóa Tiếng Anh
-STICKER_KEYWORD_MAP = {
-    "money.png": ["money", "finance", "salary", "income", "spend", "expensive", "cheap", "cash", "dollar", "pay"],
-    "house.png": ["house", "home", "apartment", "room", "rent", "real estate", "property", "mortgage"],
-    "job.png": ["job", "work", "career", "company", "boss", "employee", "project", "office", "business"],
-    "clothes.png": ["clothes", "shirt", "pants", "wear", "fashion", "outfit", "dress", "jacket"],
-    "hair.png": ["hair", "hairstyle", "haircut", "shampoo", "barber", "salon"],
-    "shoes.png": ["shoes", "sneakers", "boots", "walk", "footwear", "heels"],
-    "taste.png": ["taste", "delicious", "food", "eat", "drink", "sweet", "salty", "sour", "spicy", "yummy", "flavor"]
+TOPIC_STICKER_MAP = {
+    "finance": {
+        "stickers": ["money.png"],
+        "keywords": [
+            "money", "finance", "salary", "income", "spend", "expensive", "cheap",
+            "cash", "dollar", "pay", "price", "cost", "budget", "buy", "sell",
+            "profit", "bill", "debt", "saving", "investment", "rich", "poor"
+        ],
+    },
+    "housing": {
+        "stickers": ["house.png"],
+        "keywords": [
+            "house", "home", "apartment", "room", "rent", "property", "mortgage",
+            "real", "estate", "landlord", "kitchen", "bedroom", "living", "move",
+            "address", "neighborhood"
+        ],
+    },
+    "work": {
+        "stickers": ["job.png"],
+        "keywords": [
+            "job", "work", "career", "company", "boss", "employee", "project",
+            "office", "business", "meeting", "client", "deadline", "task",
+            "interview", "resume", "hire", "team", "startup"
+        ],
+    },
+    "fashion": {
+        "stickers": ["clothes.png", "shoes.png", "hair.png"],
+        "keywords": [
+            "clothes", "shirt", "pants", "wear", "fashion", "outfit", "dress",
+            "jacket", "style", "look", "shopping", "brand", "shoes", "sneakers",
+            "boots", "heels", "hair", "hairstyle", "haircut", "barber", "salon"
+        ],
+    },
+    "food": {
+        "stickers": ["taste.png"],
+        "keywords": [
+            "taste", "delicious", "food", "eat", "drink", "sweet", "salty", "sour",
+            "spicy", "yummy", "flavor", "cook", "restaurant", "meal", "breakfast",
+            "lunch", "dinner", "coffee", "tea", "snack"
+        ],
+    },
 }
 
-def generate_auto_stickers(transcript_words):
+DEFAULT_DURATION = 1.0
+MIN_GAP_SECONDS = 1.5
+MAX_STICKERS = 10
+
+
+def _normalize_words(text):
+    raw_words = re.findall(r"[a-z]+", str(text).lower())
+    normalized = []
+    for word in raw_words:
+        normalized.append(word)
+        if HAS_WORDNET:
+            normalized.append(lemmatizer.lemmatize(word, pos="n"))
+            normalized.append(lemmatizer.lemmatize(word, pos="v"))
+    return normalized
+
+
+def _score_topics(text):
+    words = _normalize_words(text)
+    if not words:
+        return []
+
+    scored_topics = []
+    word_set = set(words)
+    for topic, config in TOPIC_STICKER_MAP.items():
+        score = 0
+        for keyword in config["keywords"]:
+            keyword_words = keyword.split()
+            if len(keyword_words) > 1:
+                if keyword in str(text).lower():
+                    score += 3
+            elif keyword in word_set:
+                score += 2
+
+        if score > 0:
+            scored_topics.append((topic, score))
+
+    scored_topics.sort(key=lambda item: item[1], reverse=True)
+    return scored_topics
+
+
+def _pick_sticker_for_topic(topic, usage_count):
+    stickers = TOPIC_STICKER_MAP[topic]["stickers"]
+    return min(stickers, key=lambda sticker: usage_count.get(sticker, 0))
+
+
+def generate_auto_stickers(transcript_segments):
     suggested_stickers = []
-    DEFAULT_DURATION = 1.0 # Ép cứng thời lượng hiển thị nhấp nháy đúng 1.0 giây
-    
-    for item in transcript_words:
-        # Hỗ trợ linh hoạt cả key 'word' hoặc 'text' truyền từ Frontend
-        sentence = str(item.get('word', '') or item.get('text', '')).lower()
-        segment_start = float(item.get('start', 0))
-        segment_end = float(item.get('end', 0))
-        segment_duration = segment_end - segment_start
-        
-        # Tách câu thành mảng các từ rời rạc bằng Regex
-        words = re.findall(r'[a-z]+', sentence)
-        total_words = len(words)
-        
-        if total_words == 0:
+    usage_count = {}
+    last_insert_time = -999.0
+
+    for item in transcript_segments:
+        sentence = str(item.get("text", "") or item.get("word", "")).strip()
+        if not sentence:
             continue
-            
-        # Duyệt qua từng từ kèm theo vị trí của nó trong câu (Index) để phân rã thời gian
-        for idx, w in enumerate(words):
-            # NLP: Đưa từ về dạng nguyên thể (houses -> house, spent -> spend)
-            lemma_n = lemmatizer.lemmatize(w, pos='n') 
-            lemma_v = lemmatizer.lemmatize(w, pos='v') 
-            
-            matched_sticker = None
-            
-            for sticker_file, keywords in STICKER_KEYWORD_MAP.items():
-                if w in keywords or lemma_n in keywords or lemma_v in keywords:
-                    matched_sticker = sticker_file
-                    break # Dừng tìm kiếm khi đã khớp từ khóa
-                    
-            if matched_sticker:
-                # THUẬT TOÁN ĐỊNH VỊ THỜI GIAN THỰC CỦA TỪ TRONG CÂU ĐOẠN PHỤ ĐỀ:
-                word_progress = idx / total_words
-                sticker_start = segment_start + (segment_duration * word_progress)
-                
-                # Đảm bảo điểm kết thúc của Sticker không vượt quá giới hạn của block phụ đề đó
-                if sticker_start + DEFAULT_DURATION > segment_end:
-                    sticker_start = max(segment_start, segment_end - DEFAULT_DURATION)
-                
-                suggested_stickers.append({
-                    "id": str(uuid.uuid4()), 
-                    "type": "sticker",
-                    # SỬA ĐỒNG BỘ: Gọi trực tiếp tới thư mục public/stickers/ của Frontend Next.js
-                    "src": f"/stickers/{matched_sticker}", 
-                    "startTime": round(sticker_start, 2),
-                    "endTime": round(sticker_start + DEFAULT_DURATION, 2),
-                    "layer": 50, # Đẩy lên layer 50 nằm trên cùng khớp với thiết kế chung
-                    "position": {"x": 50, "y": 50}, 
-                    "scale": 0.8 # Tỉ lệ zoom 0.8 vừa vặn khung hình
-                })
-            
+
+        segment_start = float(item.get("start", 0))
+        segment_end = float(item.get("end", segment_start))
+        if segment_end <= segment_start:
+            continue
+
+        scored_topics = _score_topics(sentence)
+        if not scored_topics:
+            continue
+
+        if segment_start - last_insert_time < MIN_GAP_SECONDS:
+            continue
+
+        topic = scored_topics[0][0]
+        sticker_file = _pick_sticker_for_topic(topic, usage_count)
+        usage_count[sticker_file] = usage_count.get(sticker_file, 0) + 1
+
+        segment_duration = segment_end - segment_start
+        sticker_start = segment_start + min(segment_duration * 0.35, max(0.0, segment_duration - DEFAULT_DURATION))
+        sticker_end = min(segment_end, sticker_start + DEFAULT_DURATION)
+        if sticker_end <= sticker_start:
+            sticker_end = sticker_start + DEFAULT_DURATION
+
+        suggested_stickers.append({
+            "id": str(uuid.uuid4()),
+            "type": "sticker",
+            "src": f"/stickers/{sticker_file}",
+            "topic": topic,
+            "startTime": round(sticker_start, 2),
+            "endTime": round(sticker_end, 2),
+            "layer": 50,
+            "position": {"x": 50, "y": 50},
+            "scale": 0.8
+        })
+        last_insert_time = sticker_start
+
+        if len(suggested_stickers) >= MAX_STICKERS:
+            break
+
     return suggested_stickers

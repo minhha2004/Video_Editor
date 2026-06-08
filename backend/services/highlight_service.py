@@ -4,7 +4,7 @@ from pydub import AudioSegment
 import cv2
 import json
 
-def get_highlight_segment(video_path):
+def get_highlight_segment(video_path, target_duration=None):
     """
     Hệ thống AI Highlight Chuyên nghiệp:
     - Không in lỗi rác ra Terminal.
@@ -18,8 +18,11 @@ def get_highlight_segment(video_path):
         audio = AudioSegment.from_file(video_path)
         video_duration = float(len(audio) / 1000.0)
         
-        # TỰ ĐỘNG ƯỚC LƯỢNG ĐỘ DÀI HIGHLIGHT (15% video, min 5s, max 25s)
-        duration_limit = max(5, min(25, video_duration * 0.15))
+        # Nếu người dùng chọn độ dài, dùng độ dài đó. Nếu không, giữ logic tự động cũ.
+        if target_duration is not None:
+            duration_limit = max(1.0, min(float(target_duration), video_duration))
+        else:
+            duration_limit = max(5, min(25, video_duration * 0.15))
         
         loudness_data = []
         for i in range(0, len(audio), 500):

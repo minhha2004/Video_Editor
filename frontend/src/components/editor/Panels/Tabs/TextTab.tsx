@@ -9,11 +9,13 @@ export const TextTab = () => {
   const {
     audioSrc, 
     videoSrc, 
-    showText, 
     textConfig, 
+    texts,
     subtitles, 
-    setShowText, 
     setTextConfig, 
+    addText,
+    updateText,
+    removeText,
     setSubtitles,
     clearSubtitles, // Action mới
     saveHistory
@@ -91,28 +93,58 @@ export const TextTab = () => {
         </div>
       )}
       
-      {/* Nút Heading Thủ Công */}
+      {/* Nút thêm Text thủ công */}
       <button 
         onClick={() => {
           if (saveHistory) saveHistory();
-          setShowText(!showText);
+          addText();
         }} 
-        className={`w-full py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all mb-6 active:scale-[0.98] ${
-          showText 
-            ? 'bg-rose-500/10 border border-rose-500/30 text-rose-500 hover:bg-rose-500/20' 
-            : 'bg-indigo-600 text-white hover:bg-indigo-500'
-        }`}
+        className="w-full py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all mb-6 active:scale-[0.98] bg-indigo-600 text-white hover:bg-indigo-500"
       >
-        {showText ? "- Remove Heading" : "+ Add Heading"}
+        + Add Text
       </button>
       
-      {/* Form tùy chỉnh Heading */}
-      {showText && textConfig && (
+      {/* Form tùy chỉnh nhiều Text */}
+      {texts.length > 0 && textConfig && (
         <div className="space-y-6 bg-white/5 p-5 rounded-2xl border border-white/5">
+          <div className="space-y-2 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+            {texts.map((text: any, index: number) => (
+              <div
+                key={text.id}
+                className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+                  textConfig.id === text.id
+                    ? 'bg-indigo-500/10 border-indigo-500/30'
+                    : 'bg-zinc-900/40 border-white/5 hover:border-zinc-700'
+                }`}
+              >
+                <button
+                  onClick={() => setTextConfig(text)}
+                  className="flex-1 text-left overflow-hidden"
+                >
+                  <p className="text-[10px] text-zinc-200 font-bold truncate">
+                    {text.content || `Text ${index + 1}`}
+                  </p>
+                  <p className="text-[8px] text-zinc-500 font-mono mt-1 uppercase">
+                    {text.start.toFixed(1)}s → {text.end.toFixed(1)}s
+                  </p>
+                </button>
+                <button
+                  onClick={() => {
+                    saveHistory();
+                    removeText(text.id);
+                  }}
+                  className="text-[10px] text-rose-500 font-black px-2 hover:text-rose-400"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+
           <input 
             type="text" 
             value={textConfig.content} 
-            onChange={(e) => setTextConfig({...textConfig, content: e.target.value})} 
+            onChange={(e) => updateText(textConfig.id, {...textConfig, content: e.target.value})} 
             className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-indigo-500 transition-colors" 
           />
           <div className="grid grid-cols-2 gap-4">
@@ -121,7 +153,7 @@ export const TextTab = () => {
               <input 
                 type="color" 
                 value={textConfig.color} 
-                onChange={(e) => setTextConfig({...textConfig, color: e.target.value})} 
+                onChange={(e) => updateText(textConfig.id, {...textConfig, color: e.target.value})} 
                 className="w-full h-11 bg-zinc-900 border border-white/5 rounded-xl cursor-pointer p-1" 
               />
             </div>
@@ -130,7 +162,7 @@ export const TextTab = () => {
               <input 
                 type="number" 
                 value={textConfig.fontSize} 
-                onChange={(e) => setTextConfig({...textConfig, fontSize: parseInt(e.target.value) || 10})} 
+                onChange={(e) => updateText(textConfig.id, {...textConfig, fontSize: parseInt(e.target.value) || 10})} 
                 className="w-full h-11 bg-zinc-900 border border-white/10 rounded-xl px-4 text-xs text-white outline-none focus:border-indigo-500 transition-colors" 
               />
             </div>

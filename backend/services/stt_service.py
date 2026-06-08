@@ -11,7 +11,7 @@ except Exception as e:
 def transcribe_audio(file_path: str):
     if not os.path.exists(file_path):
         print(f"Error: File not found at {file_path}")
-        return []
+        return {"language": None, "language_probability": 0.0, "subtitles": []}
 
     print(f"Processing file for STT: {os.path.basename(file_path)}")
 
@@ -23,8 +23,17 @@ def transcribe_audio(file_path: str):
             task="transcribe",
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
+            condition_on_previous_text=False,
+            temperature=0.0,
             # --- TÍNH NĂNG MỚI: Yêu cầu AI đo thời gian của TỪNG CHỮ MỘT ---
             word_timestamps=True 
+        )
+
+        detected_language = getattr(info, "language", None)
+        language_probability = float(getattr(info, "language_probability", 0.0) or 0.0)
+        print(
+            f"Detected language: {detected_language or 'unknown'} "
+            f"({round(language_probability * 100, 1)}%)"
         )
 
         subtitles = []
@@ -50,8 +59,12 @@ def transcribe_audio(file_path: str):
                 })
                 print(f"[{round(segment.start, 2)}s -> {round(segment.end, 2)}s]: {text}")
 
-        return subtitles
+        return {
+            "language": detected_language,
+            "language_probability": round(language_probability, 4),
+            "subtitles": subtitles,
+        }
 
     except Exception as e:
         print(f"Critical error during transcription: {str(e)}")
-        return []
+        return {"language": None, "language_probability": 0.0, "subtitles": []}

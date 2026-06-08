@@ -68,35 +68,7 @@ export const AssetsTab = () => {
 
       const data = await response.json();
       if (data.success && data.stickers) {
-        
-        // THUẬT TOÁN ĐỊNH VỊ CHÍNH XÁC KHOẢNH KHẮC MÀ KHÔNG CÓ ĐỘ TRỄ CHÈN VÀO
-        const fixedStickers = data.stickers.map((stk: any) => {
-          const keyword = (stk.word || "").toLowerCase().trim();
-          let calculatedStart = stk.startTime;
-
-          if (keyword) {
-            for (const sub of subtitles) {
-              const subText = (sub.text || sub.word || "").toLowerCase();
-              
-              if (subText.includes(keyword)) {
-                const subDuration = sub.end - sub.start;
-                const wordIndex = subText.indexOf(keyword);
-                const progressRatio = subText.length > 0 ? wordIndex / subText.length : 0;
-                
-                calculatedStart = sub.start + (subDuration * progressRatio);
-                break;
-              }
-            }
-          }
-
-          return {
-            ...stk,
-            startTime: calculatedStart,
-            endTime: calculatedStart + 1.0 // Ép cứng thời lượng hiển thị chớp tắt đúng 1 giây
-          };
-        });
-
-        setStickers(fixedStickers);
+        setStickers(data.stickers);
       }
     } catch (error) {
       console.error("Lỗi hệ thống khi chạy Auto Mix:", error);

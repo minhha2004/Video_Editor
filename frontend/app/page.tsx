@@ -25,6 +25,37 @@ export default function Home() {
 
   const { handleDrag } = useTimelineDrag(timelineRef, containerRef, videoRef);
 
+  const handlePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (store.isPlaying) {
+      video.pause();
+      store.setIsPlaying(false);
+      return;
+    }
+
+    if (store.activeSegments.length > 0) {
+      const isInsideSegment = store.activeSegments.some(
+        (segment) => video.currentTime >= segment.start && video.currentTime <= segment.end
+      );
+      if (!isInsideSegment) {
+        const firstSegmentStart = store.activeSegments[0].start;
+        video.currentTime = firstSegmentStart;
+        store.setCurrentTime(firstSegmentStart);
+      }
+    } else if (store.trimEnd > 0) {
+      const isInsideTrim = video.currentTime >= store.trimStart && video.currentTime < store.trimEnd;
+      if (!isInsideTrim) {
+        video.currentTime = store.trimStart;
+        store.setCurrentTime(store.trimStart);
+      }
+    }
+
+    video.play();
+    store.setIsPlaying(true);
+  };
+
   // Phím tắt Ctrl+Z / Ctrl+Y
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,11 +144,7 @@ export default function Home() {
                 <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12.5 5.5V18.5L2 12L12.5 5.5ZM22 5.5V18.5L11.5 12L22 5.5Z" /></svg>
                </button>
                <button 
-                 onClick={() => {
-                   if(!videoRef.current) return; 
-                   store.isPlaying ? videoRef.current.pause() : videoRef.current.play(); 
-                   store.setIsPlaying(!store.isPlaying);
-                 }} 
+                 onClick={handlePlayPause} 
                  className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center text-white transition-transform active:scale-90"
                >
                  {store.isPlaying ? 
@@ -145,7 +172,7 @@ export default function Home() {
               <button onClick={() => store.undo()} disabled={store.historyIndex < 0} className="p-2.5 hover:bg-white/5 disabled:opacity-20 transition-all border-r border-white/5 text-zinc-400" title="Undo">
                 <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M3 10h10a5 5 0 010 10H3M3 10l4-4M3 10l4 4" /></svg>
               </button>
-              <button onClick={() => store.redo()} disabled={store.historyIndex >= store.history.length - 1} className="p-2.5 hover:bg-white/5 disabled:opacity-20 transition-all text-zinc-400" title="Redo">
+              <button onClick={() => store.redo()} disabled={store.redoHistory.length === 0} className="p-2.5 hover:bg-white/5 disabled:opacity-20 transition-all text-zinc-400" title="Redo">
                 <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M21 10H11a5 5 0 000 10h10M21 10l-4-4M21 10l-4 4" /></svg>
               </button>
             </div>

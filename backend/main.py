@@ -130,8 +130,10 @@ async def api_stt(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
         
     try:
-        subtitles = transcribe_audio(file_path)
-        return {"subtitles": subtitles}
+        result = transcribe_audio(file_path)
+        if isinstance(result, dict):
+            return result
+        return {"language": None, "language_probability": 0.0, "subtitles": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -206,7 +208,7 @@ async def api_render(
 
 
 @app.post("/api/ai/detect-highlight")
-async def api_detect_highlight(file: UploadFile = File(...)):
+async def api_detect_highlight(file: UploadFile = File(...), duration: Optional[float] = Form(None)):
     job_id = str(uuid.uuid4())
     temp_path = f"uploads/ai_{job_id}.mp4"
     
@@ -214,7 +216,7 @@ async def api_detect_highlight(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
         
     try:
-        result = get_highlight_segment(temp_path) 
+        result = get_highlight_segment(temp_path, duration) 
         return result
     finally:
         if os.path.exists(temp_path):

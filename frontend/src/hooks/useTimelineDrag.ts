@@ -34,6 +34,7 @@ export const useTimelineDrag = (
     
     // Lấy ID của sticker đang được chọn tương tác từ window toàn cục
     const activeStickerId = (window as any).activeStickerId;
+    const activeTextId = (window as any).activeTextId;
 
     // ==========================================
     // 1. TƯƠNG TÁC CHUỘT TRÊN MÀN HÌNH PREVIEW
@@ -68,10 +69,11 @@ export const useTimelineDrag = (
     }
 
     // CASE C: KÉO VỊ TRÍ TEXT TRÊN MÀN HÌNH PREVIEW
-    if (store.isDragging === 'text-pos' && containerRef.current) {
+    if (store.isDragging === 'text-pos' && activeTextId && containerRef.current) {
       const cRect = containerRef.current.getBoundingClientRect();
-      store.setTextConfig({
-        ...store.textConfig,
+      const targetText = store.texts.find((text: any) => text.id === activeTextId);
+      if (!targetText) return;
+      store.updateText(activeTextId, {
         x: Math.max(0, Math.min(((e.clientX - cRect.left) / cRect.width) * 100, 100)),
         y: Math.max(0, Math.min(((e.clientY - cRect.top) / cRect.height) * 100, 100))
       });
@@ -79,16 +81,15 @@ export const useTimelineDrag = (
     }
 
     // CASE D (MỚI BỔ SUNG): CO GIÃN PHÓNG TO / THU NHỎ KÍCH THƯỚC CHỮ (TEXT SCALE)
-    if (store.isDragging === 'text-scale') {
-      const currentFontSize = store.textConfig.fontSize || 40;
+    if (store.isDragging === 'text-scale' && activeTextId) {
+      const targetText = store.texts.find((text: any) => text.id === activeTextId);
+      if (!targetText) return;
+      const currentFontSize = targetText.fontSize || 40;
       // Di chuột sang phải (e.movementX > 0) chữ to lên, sang trái chữ nhỏ đi
       const fontSizeDelta = e.movementX * 0.5;
       const newFontSize = Math.max(12, Math.min(currentFontSize + fontSizeDelta, 120)); // Giới hạn kích thước chữ từ 12px đến 120px
 
-      store.setTextConfig({
-        ...store.textConfig,
-        fontSize: Math.round(newFontSize)
-      });
+      store.updateText(activeTextId, { fontSize: Math.round(newFontSize) });
       return;
     }
 
@@ -169,19 +170,32 @@ export const useTimelineDrag = (
             store.setTrimEnd(newEnd);
             break;
           }
-          case 'text-start': 
-            store.setTextConfig({ ...store.textConfig, start: Math.min(timeOnTimeline, store.textConfig.end - 0.2) }); 
+          case 'text-start': {
+            if (!activeTextId) break;
+            const target = store.texts.find((text: any) => text.id === activeTextId);
+            if (target) {
+              store.updateText(activeTextId, { start: Math.min(timeOnTimeline, target.end - 0.2) }); 
+            }
             break;
-          case 'text-end': 
-            store.setTextConfig({ ...store.textConfig, end: Math.max(timeOnTimeline, store.textConfig.start + 0.2) }); 
+          }
+          case 'text-end': {
+            if (!activeTextId) break;
+            const target = store.texts.find((text: any) => text.id === activeTextId);
+            if (target) {
+              store.updateText(activeTextId, { end: Math.max(timeOnTimeline, target.start + 0.2) }); 
+            }
             break;
+          }
           case 'text-move': {
-            const duration = store.textConfig.end - store.textConfig.start;
+            if (!activeTextId) break;
+            const target = store.texts.find((text: any) => text.id === activeTextId);
+            if (!target) break;
+            const duration = target.end - target.start;
             let newStart = timeOnTimeline - (duration / 2);
             let newEnd = newStart + duration;
             if (newStart < 0) { newStart = 0; newEnd = duration; }
             if (newEnd > displayDuration) { newEnd = displayDuration; newStart = displayDuration - duration; }
-            store.setTextConfig({ ...store.textConfig, start: newStart, end: newEnd });
+            store.updateText(activeTextId, { start: newStart, end: newEnd });
             break;
           }
           case 'audio-start': {

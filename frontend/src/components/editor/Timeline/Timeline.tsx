@@ -5,6 +5,45 @@ interface TimelineProps {
   timelineRef: React.RefObject<HTMLDivElement | null>;
 }
 
+const formatTime = (seconds: number) => {
+  if (!Number.isFinite(seconds)) return "00:00.0";
+  const safe = Math.max(0, seconds);
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toFixed(1).padStart(4, '0')}`;
+};
+
+const TrackLabel = ({ type, label, color }: { type: 'video' | 'stickers' | 'text' | 'audio'; label: string; color: string }) => {
+  const iconClass = "w-4 h-4";
+  return (
+    <div className={`w-20 text-[11px] font-black uppercase flex items-center gap-2 shrink-0 ${color}`}>
+      {type === 'video' && (
+        <svg className={iconClass} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        </svg>
+      )}
+      {type === 'stickers' && (
+        <svg className={iconClass} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+        </svg>
+      )}
+      {type === 'text' && (
+        <svg className={iconClass} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7V4h16v3M9 20h6M12 4v16" />
+        </svg>
+      )}
+      {type === 'audio' && (
+        <svg className={iconClass} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+      )}
+      <span>{label}</span>
+    </div>
+  );
+};
+
 export const Timeline = ({ timelineRef }: TimelineProps) => {
   const store = useVideoStore() as any;
   const {
@@ -12,14 +51,13 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
     currentTime,
     videoSrc,
     audioSrc,
-    showText,
     trimStart,
     trimEnd,
-    textConfig,
     audioConfig,
     activeSegments,       
     totalTrimmedDuration, 
     stickers,
+    texts,
     setIsDragging
   } = store;
 
@@ -45,13 +83,11 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
         
         {/* --- TRACK VIDEO --- */}
         <div className="flex items-center gap-6">
-          <div className="w-20 text-[11px] font-black text-zinc-500 uppercase flex items-center gap-2 shrink-0">
-            <span>🎬</span> Video
-          </div>
+          <TrackLabel type="video" label="Video" color="text-zinc-500" />
           <div 
             ref={timelineRef} 
             onMouseDown={() => setIsDragging('playhead')} 
-            className="flex-1 h-12 bg-zinc-900/50 rounded-lg border border-white/5 relative cursor-crosshair overflow-hidden"
+            className="flex-1 h-12 bg-zinc-900/50 rounded-lg border border-white/5 relative cursor-crosshair overflow-visible"
           >
             {videoSrc && (
               <>
@@ -76,6 +112,12 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
                     style={{ left: `${getPos(trimStart)}%`, right: `${100 - getPos(trimEnd)}%` }}
                     onMouseDown={(e) => { e.stopPropagation(); setIsDragging('video-move'); }}
                   >
+                    <div className="absolute -top-6 left-0 -translate-x-1/2 rounded bg-zinc-950/95 border border-indigo-500/30 px-1.5 py-0.5 text-[9px] font-mono font-bold text-indigo-300 shadow-lg pointer-events-none tabular-nums">
+                      {formatTime(trimStart)}
+                    </div>
+                    <div className="absolute -top-6 right-0 translate-x-1/2 rounded bg-zinc-950/95 border border-indigo-500/30 px-1.5 py-0.5 text-[9px] font-mono font-bold text-indigo-300 shadow-lg pointer-events-none tabular-nums">
+                      {formatTime(trimEnd)}
+                    </div>
                     <div onMouseDown={(e) => { e.stopPropagation(); setIsDragging('trim-start'); }} className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/30" />
                     <div onMouseDown={(e) => { e.stopPropagation(); setIsDragging('trim-end'); }} className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/30" />
                   </div>
@@ -96,9 +138,7 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
         {/* --- TRACK STICKERS --- */}
         {stickers.length > 0 && (
           <div className="flex items-center gap-6 animate-in slide-in-from-left duration-300">
-             <div className="w-20 text-[11px] font-black text-amber-400 uppercase flex items-center gap-2 shrink-0">
-               <span>🎨</span> Stickers
-             </div>
+             <TrackLabel type="stickers" label="Stickers" color="text-amber-400" />
              <div className="flex-1 h-12 bg-zinc-900/50 rounded-lg border border-white/5 relative overflow-hidden">
                 {stickers.map((sticker: any) => {
                   const isFocused = (window as any).activeStickerId === sticker.id;
@@ -157,20 +197,44 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
         )}
 
         {/* --- TRACK TEXT --- */}
-        {showText && (
+        {texts.length > 0 && (
           <div className="flex items-center gap-6 animate-in slide-in-from-left duration-300">
-             <div className="w-20 text-[11px] font-black text-indigo-400 uppercase flex items-center gap-2 shrink-0">
-               <span>TXT</span> Text
-             </div>
+             <TrackLabel type="text" label="Text" color="text-indigo-400" />
              <div className="flex-1 h-10 bg-zinc-900/50 rounded-lg border border-white/5 relative overflow-hidden">
+              {texts.map((text: any) => {
+                const isFocused = (window as any).activeTextId === text.id;
+                return (
                 <div 
-                  className="absolute inset-y-1 bg-indigo-500/30 border-x-2 border-indigo-500/50 rounded shadow-md cursor-grab active:cursor-grabbing" 
-                  style={{ left: `${getPos(textConfig.start)}%`, right: `${100 - getPos(textConfig.end)}%` }}
-                  onMouseDown={(e) => { e.stopPropagation(); setIsDragging('text-move'); }}
+                  key={text.id}
+                  className={`absolute inset-y-1 bg-indigo-500/30 border-x-2 rounded shadow-md cursor-grab active:cursor-grabbing transition-colors ${
+                    isFocused ? 'border-indigo-400 bg-indigo-500/45 z-30' : 'border-indigo-500/50'
+                  }`}
+                  style={{ left: `${getPos(text.start)}%`, right: `${100 - getPos(text.end)}%` }}
+                  onMouseDown={(e) => { 
+                    e.stopPropagation(); 
+                    (window as any).activeTextId = text.id;
+                    store.setTextConfig(text);
+                    setIsDragging('text-move'); 
+                  }}
                 >
-                  <div onMouseDown={(e) => { e.stopPropagation(); setIsDragging('text-start'); }} className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30" />
-                  <div onMouseDown={(e) => { e.stopPropagation(); setIsDragging('text-end'); }} className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30" />
+                  <div onMouseDown={(e) => { 
+                    e.stopPropagation(); 
+                    (window as any).activeTextId = text.id;
+                    store.setTextConfig(text);
+                    setIsDragging('text-start'); 
+                  }} className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30" />
+                  <div className="h-full flex items-center justify-center px-2 pointer-events-none select-none overflow-hidden">
+                    <span className="text-[9px] font-bold text-indigo-100 truncate uppercase">{text.content}</span>
+                  </div>
+                  <div onMouseDown={(e) => { 
+                    e.stopPropagation(); 
+                    (window as any).activeTextId = text.id;
+                    store.setTextConfig(text);
+                    setIsDragging('text-end'); 
+                  }} className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30" />
                 </div>
+                );
+              })}
              </div>
           </div>
         )}
@@ -178,9 +242,7 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
         {/* --- TRACK AUDIO --- */}
         {audioSrc && (
           <div className="flex items-center gap-6 animate-in slide-in-from-left duration-300">
-             <div className="w-20 text-[11px] font-black text-emerald-400 uppercase flex items-center gap-2 shrink-0">
-               <span>🎵</span> Audio
-             </div>
+             <TrackLabel type="audio" label="Audio" color="text-emerald-400" />
              <div className="flex-1 h-10 bg-zinc-900/50 rounded-lg border border-white/5 relative overflow-hidden">
                 <div 
                   className="absolute inset-y-1 bg-emerald-500/20 border-x-2 border-emerald-500/50 rounded shadow-md cursor-grab active:cursor-grabbing" 

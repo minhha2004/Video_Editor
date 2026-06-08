@@ -18,21 +18,24 @@ export const MediaTab = () => {
   // Đưa state cục bộ của Media Tab về đúng file của nó
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSmartMenu, setShowSmartMenu] = useState(false);
+  const [showHighlightDurationInput, setShowHighlightDurationInput] = useState(false);
+  const [highlightDuration, setHighlightDuration] = useState("15");
 
-  const handleSmartHighlight = async () => {
+  const handleSmartHighlight = async (durationSeconds?: number) => {
     const { videoFile } = useVideoStore.getState();
     if (!videoFile) return alert("Vui lòng upload video trước!");
     
     setIsAnalyzing(true);
     setShowSmartMenu(false);
+    setShowHighlightDurationInput(false);
     try {
-      const data = await aiService.detectHighlight(videoFile);
+      const data = await aiService.detectHighlight(videoFile, durationSeconds);
       saveHistory(); 
       setActiveSegments([]); 
       setTrimStart(data.start);
       setTrimEnd(data.end);
       alert("✨ Đã tìm thấy đoạn Highlight tốt nhất!");
-    } catch (error) {
+    } catch {
       alert("Lỗi AI Highlight!");
     } finally {
       setIsAnalyzing(false);
@@ -52,7 +55,7 @@ export const MediaTab = () => {
         setActiveSegments(data.segments);
         alert(`🔇 Đã cắt thành công! Tìm thấy ${data.segments.length} đoạn có tiếng.`);
       }
-    } catch (error) {
+    } catch {
       alert("Lỗi khi phân tích khoảng lặng!");
     } finally {
       setIsAnalyzing(false);
@@ -98,9 +101,42 @@ export const MediaTab = () => {
 
         {showSmartMenu && (
           <div className="absolute top-full left-0 w-full mt-2 bg-[#1c1c1f] border border-white/10 rounded-xl overflow-hidden z-[100] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <button onClick={handleSmartHighlight} className="w-full px-4 py-3 text-[10px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-3 border-b border-white/5">
-              <span className="text-sm">🌟</span> AI Smart Highlight
-            </button>
+            <div className="relative border-b border-white/5">
+              <button 
+                onClick={() => setShowHighlightDurationInput(true)} 
+                className="w-full px-4 py-3 text-[10px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-3"
+              >
+                <span className="text-sm">🌟</span> AI Smart Highlight
+              </button>
+
+              {showHighlightDurationInput && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-[#111114] border border-indigo-500/30 rounded-lg px-2 py-1 shadow-xl">
+                  <input
+                    autoFocus
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={highlightDuration}
+                    onChange={(e) => setHighlightDuration(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const seconds = Number(highlightDuration);
+                        if (!Number.isFinite(seconds) || seconds <= 0) {
+                          alert("Vui lòng nhập thời lượng hợp lệ!");
+                          return;
+                        }
+                        handleSmartHighlight(seconds);
+                      }
+                      if (e.key === 'Escape') {
+                        setShowHighlightDurationInput(false);
+                      }
+                    }}
+                    className="w-12 bg-transparent text-[10px] font-mono font-bold text-indigo-300 outline-none text-right"
+                  />
+                  <span className="text-[9px] font-black text-zinc-500 uppercase">sec</span>
+                </div>
+              )}
+            </div>
             <button onClick={handleAutoCutSilence} className="w-full px-4 py-3 text-[10px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-3">
               <span className="text-sm">🔇</span> Auto Cut Silence
             </button>

@@ -11,6 +11,12 @@ export interface TextConfig {
   end: number;   // Thời điểm biến mất (giây)
 }
 
+export interface TextElement extends TextConfig {
+  id: string;
+  type: 'text';
+  layer: number;
+}
+
 /**
  * Cấu hình cho tệp âm thanh bổ sung (Background Music/AI Voice)
  */
@@ -56,7 +62,10 @@ export type DragType =
   | 'trim-start' | 'trim-end' | 'video-move' 
   | 'text-start' | 'text-end' | 'text-move' 
   | 'audio-start' | 'audio-end' | 'audio-move' 
-  | 'text-pos' | 'playhead' | null;
+  | 'text-pos' | 'text-scale'
+  | 'sticker-start' | 'sticker-end' | 'sticker-move'
+  | 'sticker-pos' | 'sticker-scale'
+  | 'playhead' | null;
 
 /**
  * Cấu hình tổng quát gửi sang Backend Python để Render
@@ -67,6 +76,7 @@ export interface RenderConfig {
   isLandscape: boolean;
   isVideoMuted: boolean;
   text: TextConfig | null;
+  texts?: TextElement[];
   audio: AudioConfig | null;
   subtitles: SubtitleItem[];
   stickers: StickerElement[]; // Bổ sung để Backend biết cần chèn sticker nào

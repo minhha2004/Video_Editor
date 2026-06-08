@@ -23,7 +23,7 @@ export default function ExportPublisher() {
     formData.append('video', store.videoFile);
     
     // 2. Xử lý đóng gói tệp âm thanh bổ sung một cách an toàn
-    const currentAudioUrl = store.audioUrl || "";
+    const currentAudioUrl = store.audioSrc || "";
     if (store.audioFile) {
       formData.append('audio', store.audioFile);
     } else if (currentAudioUrl && currentAudioUrl.trim() !== '' && currentAudioUrl.startsWith('blob:')) {
@@ -81,8 +81,12 @@ export default function ExportPublisher() {
       subtitleList: store.subtitles || cleanStoreData.subtitles || [],
       stickers: store.stickers || cleanStoreData.stickers || cleanStoreData.assetStickers || [],
       stickerList: store.stickers || cleanStoreData.stickers || [],
-      text: store.textConfig || cleanStoreData.textConfig || null,
+      texts: store.texts || cleanStoreData.texts || [],
+      textList: store.texts || cleanStoreData.texts || [],
+      text: store.texts?.[0] || store.textConfig || cleanStoreData.textConfig || null,
       textConfig: store.textConfig || cleanStoreData.textConfig || null,
+      audio: store.audioConfig || cleanStoreData.audioConfig || null,
+      audioConfig: store.audioConfig || cleanStoreData.audioConfig || null,
       
       // Bơm kèm toàn bộ dữ liệu thô đã được làm sạch rác để làm phương án dự phòng tối cao
       ...cleanStoreData
