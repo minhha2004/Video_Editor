@@ -177,7 +177,7 @@ export default function Home() {
               </button>
             </div>
         </div>
-        <Timeline timelineRef={timelineRef} />
+        <Timeline timelineRef={timelineRef} videoRef={videoRef} />
       </div>
       
       <audio ref={audioRef} src={store.audioSrc || undefined} className="hidden" />

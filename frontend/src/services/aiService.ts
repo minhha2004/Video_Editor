@@ -94,11 +94,17 @@ export const aiService = {
    * CHUẨN HÓA: Trả về kết quả thô sạch từ AI để nhường quyền xử lý gộp mảng an toàn cho Zustand Store
    */
   autoMixStickers: async (transcript: any[]) => {
-    const payload = transcript.map(segment => ({
-      text: segment.text || segment.word || "",
-      start: segment.start,
-      end: segment.end
-    }));
+    const payload: any[] = [];
+    
+    transcript.forEach(segment => {
+      if (segment.words && segment.words.length > 0) {
+        segment.words.forEach((w: any) => {
+          payload.push({ word: w.word, start: w.start, end: w.end });
+        });
+      } else {
+        payload.push({ word: segment.text || segment.word, start: segment.start, end: segment.end });
+      }
+    });
 
     const response = await fetch(`${API_BASE}/ai/auto-mix`, {
       method: 'POST',

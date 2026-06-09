@@ -3,6 +3,7 @@ import { useVideoStore } from '../../../store/useVideoStore';
 
 interface TimelineProps {
   timelineRef: React.RefObject<HTMLDivElement | null>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
 const formatTime = (seconds: number) => {
@@ -44,7 +45,7 @@ const TrackLabel = ({ type, label, color }: { type: 'video' | 'stickers' | 'text
   );
 };
 
-export const Timeline = ({ timelineRef }: TimelineProps) => {
+export const Timeline = ({ timelineRef, videoRef }: TimelineProps) => {
   const store = useVideoStore() as any;
   const {
     duration,
@@ -63,6 +64,36 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
 
   const displayDuration = totalTrimmedDuration > 0 ? totalTrimmedDuration : duration;
   const getPos = (time: number) => (displayDuration > 0 ? (time / displayDuration) * 100 : 0);
+
+  const calculateOriginalTime = (trimmedTime: number) => {
+    if (activeSegments.length === 0) return trimmedTime;
+
+    let accumulatedTrimmed = 0;
+    for (const segment of activeSegments) {
+      const segmentDuration = segment.end - segment.start;
+      if (trimmedTime <= accumulatedTrimmed + segmentDuration) {
+        return segment.start + (trimmedTime - accumulatedTrimmed);
+      }
+      accumulatedTrimmed += segmentDuration;
+    }
+
+    return activeSegments[activeSegments.length - 1].end;
+  };
+
+  const seekPlayhead = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!timelineRef.current || displayDuration <= 0) return;
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+    const timeOnTimeline = (x / rect.width) * displayDuration;
+    const actualTime = calculateOriginalTime(timeOnTimeline);
+
+    if (videoRef.current) {
+      videoRef.current.currentTime = actualTime;
+    }
+    store.setCurrentTime(timeOnTimeline);
+    setIsDragging('playhead');
+  };
 
   return (
     <footer className="h-60 border-t border-white/5 bg-[#121214] flex flex-col shrink-0">
@@ -86,7 +117,7 @@ export const Timeline = ({ timelineRef }: TimelineProps) => {
           <TrackLabel type="video" label="Video" color="text-zinc-500" />
           <div 
             ref={timelineRef} 
-            onMouseDown={() => setIsDragging('playhead')} 
+            onMouseDown={seekPlayhead} 
             className="flex-1 h-12 bg-zinc-900/50 rounded-lg border border-white/5 relative cursor-crosshair overflow-visible"
           >
             {videoSrc && (

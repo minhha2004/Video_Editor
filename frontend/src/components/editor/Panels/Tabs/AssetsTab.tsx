@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from 'react';
 import { useVideoStore } from '../../../../store/useVideoStore';
+import { StickerElement } from '../../../../types/editor';
 
 export const AssetsTab = () => {
   const { stickers, setStickers, subtitles } = useVideoStore();
@@ -68,7 +69,12 @@ export const AssetsTab = () => {
 
       const data = await response.json();
       if (data.success && data.stickers) {
-        setStickers(data.stickers);
+        const existingIds = new Set(stickers.map((sticker) => sticker.id));
+        const mergedStickers = [
+          ...stickers,
+          ...data.stickers.filter((sticker: StickerElement) => !existingIds.has(sticker.id))
+        ];
+        setStickers(mergedStickers);
       }
     } catch (error) {
       console.error("Lỗi hệ thống khi chạy Auto Mix:", error);

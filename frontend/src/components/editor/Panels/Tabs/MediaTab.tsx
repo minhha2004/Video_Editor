@@ -104,20 +104,20 @@ export const MediaTab = () => {
             <div className="relative border-b border-white/5">
               <button 
                 onClick={() => setShowHighlightDurationInput(true)} 
-                className="w-full px-4 py-3 text-[10px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-3"
+                className="w-full px-5 pr-36 py-4 text-[13px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-4"
               >
-                <span className="text-sm">🌟</span> AI Smart Highlight
+                <span className="text-lg shrink-0">🌟</span>
+                <span className="whitespace-nowrap">AI Smart Highlight</span>
               </button>
 
               {showHighlightDurationInput && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-[#111114] border border-indigo-500/30 rounded-lg px-2 py-1 shadow-xl">
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-[#111114] border border-indigo-500/30 rounded-lg px-2 py-1 shadow-xl">
                   <input
                     autoFocus
-                    type="number"
-                    min="1"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
                     value={highlightDuration}
-                    onChange={(e) => setHighlightDuration(e.target.value)}
+                    onChange={(e) => setHighlightDuration(e.target.value.replace(/\D/g, ""))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const seconds = Number(highlightDuration);
@@ -131,14 +131,14 @@ export const MediaTab = () => {
                         setShowHighlightDurationInput(false);
                       }
                     }}
-                    className="w-12 bg-transparent text-[10px] font-mono font-bold text-indigo-300 outline-none text-right"
+                    className="w-7 bg-transparent text-[12px] font-mono font-bold text-indigo-300 outline-none text-right"
                   />
-                  <span className="text-[9px] font-black text-zinc-500 uppercase">sec</span>
+                  <span className="text-[10px] font-black text-zinc-500 uppercase">sec</span>
                 </div>
               )}
             </div>
-            <button onClick={handleAutoCutSilence} className="w-full px-4 py-3 text-[10px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-3">
-              <span className="text-sm">🔇</span> Auto Cut Silence
+            <button onClick={handleAutoCutSilence} className="w-full px-5 py-4 text-[13px] font-bold text-zinc-300 hover:bg-white/5 text-left flex items-center gap-4">
+              <span className="text-lg">🔇</span> Auto Cut Silence
             </button>
           </div>
         )}
